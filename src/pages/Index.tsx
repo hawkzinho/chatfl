@@ -1,164 +1,254 @@
-import { useState, useCallback } from "react";
-import { Sidebar } from "@/components/chat/Sidebar";
-import { ChatView } from "@/components/chat/ChatView";
-import { Message } from "@/types/chat";
-import { 
-  currentUser, 
-  mockRooms, 
-  mockDirectMessages, 
-  mockMessages 
-} from "@/data/mockData";
-import { toast } from "sonner";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { useRooms } from '@/hooks/useRooms';
+import { useMessages, Message } from '@/hooks/useMessages';
+import { useFriendships } from '@/hooks/useFriendships';
+import { Sidebar } from '@/components/chat/Sidebar';
+import { ChatView } from '@/components/chat/ChatView';
+import { Loader2 } from 'lucide-react';
 
 const Index = () => {
-  const [activeRoomId, setActiveRoomId] = useState(mockRooms[0].id);
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const navigate = useNavigate();
+  const { user, profile, loading: authLoading, signOut } = useAuth();
+  const { rooms, createRoom, refreshRooms } = useRooms();
+  const { friends, pendingRequests, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, startDirectMessage } = useFriendships();
+  
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  
+  const { messages, loading: messagesLoading, sendMessage, editMessage, deleteMessage, addReaction, removeReaction } = useMessages(activeRoomId);
 
-  const activeRoom = [...mockRooms, ...mockDirectMessages].find(
-    (room) => room.id === activeRoomId
-  );
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [authLoading, user, navigate]);
 
-  const roomMessages = messages.filter((msg) => msg.roomId === activeRoomId);
+  // Set first room as active if none selected
+  useEffect(() => {
+    if (!activeRoomId && rooms.length > 0) {
+      setActiveRoomId(rooms[0].id);
+    }
+  }, [rooms, activeRoomId]);
 
-  const handleSendMessage = useCallback(
-    (content: string, attachments?: File[]) => {
-      const newMessage: Message = {
-        id: `msg-${Date.now()}`,
-        content,
-        senderId: currentUser.id,
-        sender: currentUser,
-        roomId: activeRoomId,
-        createdAt: new Date(),
-        attachments: attachments?.map((file, index) => ({
-          id: `att-${Date.now()}-${index}`,
-          type: file.type.startsWith('image/') 
-            ? 'image' 
-            : file.type.startsWith('video/') 
-            ? 'video' 
-            : 'document',
-          url: URL.createObjectURL(file),
-          name: file.name,
-          size: file.size,
-          mimeType: file.type,
-        })),
-      };
+  const activeRoom = rooms.find(r => r.id === activeRoomId);
 
-      setMessages((prev) => [...prev, newMessage]);
-      
-      // Simulate read receipt after a short delay
-      setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === newMessage.id
-              ? { ...msg, readBy: ['user-1'] }
-              : msg
-          )
-        );
-      }, 2000);
-    },
-    [activeRoomId]
-  );
+  const handleSelectRoom = (roomId: string) => {
+    setActiveRoomId(roomId);
+    setReplyingTo(null);
+  };
 
-  const handleTyping = useCallback(() => {
-    // In a real app, this would emit a typing event via WebSocket
-  }, []);
+  const handleSendMessage = async (content: string) => {
+    await sendMessage(content, replyingTo?.id);
+    setReplyingTo(null);
+  };
 
-  const handleReact = useCallback((messageId: string, emoji: string) => {
-    setMessages((prev) =>
-      prev.map((msg) => {
-        if (msg.id !== messageId) return msg;
+  const handleReply = (message: any) => {
+    setReplyingTo(message);
+  };
 
-        const reactions = msg.reactions || [];
-        const existingReaction = reactions.find((r) => r.emoji === emoji);
+  const handleReact = async (messageId: string, emoji: string) => {
+    const message = messages.find(m => m.id === messageId);
+    const existingReaction = message?.reactions.find(r => r.emoji === emoji && r.users.includes(user?.id || ''));
+    
+    if (existingReaction) {
+      await removeReaction(messageId, emoji);
+    } else {
+      await addReaction(messageId, emoji);
+    }
+  };
 
-        if (existingReaction) {
-          const hasReacted = existingReaction.users.includes(currentUser.id);
-          if (hasReacted) {
-            // Remove reaction
-            const updatedUsers = existingReaction.users.filter(
-              (id) => id !== currentUser.id
-            );
-            if (updatedUsers.length === 0) {
-              return {
-                ...msg,
-                reactions: reactions.filter((r) => r.emoji !== emoji),
-              };
-            }
-            return {
-              ...msg,
-              reactions: reactions.map((r) =>
-                r.emoji === emoji ? { ...r, users: updatedUsers } : r
-              ),
-            };
-          } else {
-            // Add to existing reaction
-            return {
-              ...msg,
-              reactions: reactions.map((r) =>
-                r.emoji === emoji
-                  ? { ...r, users: [...r.users, currentUser.id] }
-                  : r
-              ),
-            };
-          }
-        } else {
-          // New reaction
-          return {
-            ...msg,
-            reactions: [...reactions, { emoji, users: [currentUser.id] }],
-          };
-        }
-      })
-    );
-  }, []);
+  const handleCreateRoom = async (name: string, description?: string) => {
+    const room = await createRoom(name, description);
+    if (room) {
+      setActiveRoomId(room.id);
+    }
+  };
 
-  const handleDeleteMessage = useCallback((message: Message) => {
-    setMessages((prev) => prev.filter((msg) => msg.id !== message.id));
-    toast.success('Message deleted');
-  }, []);
+  const handleStartDM = async (friendId: string) => {
+    const roomId = await startDirectMessage(friendId);
+    if (roomId) {
+      await refreshRooms();
+      setActiveRoomId(roomId);
+    }
+  };
 
-  const handleCreateRoom = useCallback(() => {
-    toast.info('Create room coming soon!');
-  }, []);
-
-  const handleStartDM = useCallback(() => {
-    toast.info('Start DM coming soon!');
-  }, []);
-
-  const handleLogout = useCallback(() => {
-    toast.info('Logout coming soon!');
-  }, []);
-
-  if (!activeRoom) {
+  if (authLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-background">
-        <p className="text-muted-foreground">Select a conversation</p>
+      <div className="h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
+  if (!user || !profile) {
+    return null;
+  }
+
+  const currentUser = {
+    id: profile.id,
+    username: profile.username,
+    avatar: profile.avatar_url || undefined,
+    status: profile.status as 'online' | 'offline' | 'away' | 'busy',
+  };
+
+  // Transform rooms for sidebar
+  const sidebarRooms = rooms.filter(r => r.type !== 'direct').map(r => ({
+    id: r.id,
+    name: r.name,
+    description: r.description || undefined,
+    type: r.type as 'public' | 'private' | 'direct',
+    avatar: r.avatar_url || undefined,
+    members: r.members?.map(m => ({
+      id: m.id,
+      username: m.username,
+      avatar: m.avatar_url || undefined,
+      status: m.status as 'online' | 'offline' | 'away' | 'busy',
+    })) || [],
+    lastMessage: r.last_message ? {
+      id: 'last',
+      content: r.last_message.content,
+      senderId: '',
+      sender: { id: '', username: r.last_message.sender_username, status: 'online' as const },
+      roomId: r.id,
+      createdAt: new Date(r.last_message.created_at),
+    } : undefined,
+    unreadCount: 0,
+    createdAt: new Date(r.created_at),
+  }));
+
+  // Transform DMs for sidebar
+  const directMessages = rooms.filter(r => r.type === 'direct').map(r => {
+    const otherMember = r.members?.find(m => m.id !== user.id);
+    return {
+      id: r.id,
+      name: otherMember?.username || 'Unknown',
+      type: 'direct' as const,
+      avatar: otherMember?.avatar_url || undefined,
+      members: r.members?.map(m => ({
+        id: m.id,
+        username: m.username,
+        avatar: m.avatar_url || undefined,
+        status: m.status as 'online' | 'offline' | 'away' | 'busy',
+      })) || [],
+      lastMessage: r.last_message ? {
+        id: 'last',
+        content: r.last_message.content,
+        senderId: '',
+        sender: { id: '', username: r.last_message.sender_username, status: 'online' as const },
+        roomId: r.id,
+        createdAt: new Date(r.last_message.created_at),
+      } : undefined,
+      unreadCount: 0,
+      createdAt: new Date(r.created_at),
+    };
+  });
+
+  // Transform messages for chat
+  const chatMessages = messages.map(m => ({
+    id: m.id,
+    content: m.content,
+    senderId: m.sender_id,
+    sender: {
+      id: m.sender.id,
+      username: m.sender.username,
+      avatar: m.sender.avatar_url || undefined,
+      status: m.sender.status as 'online' | 'offline' | 'away' | 'busy',
+    },
+    roomId: m.room_id,
+    createdAt: new Date(m.created_at),
+    updatedAt: m.updated_at ? new Date(m.updated_at) : undefined,
+    isEdited: m.is_edited,
+    reactions: m.reactions as { emoji: string; users: string[] }[],
+    replyTo: m.reply_to ? {
+      id: m.reply_to.id,
+      content: m.reply_to.content,
+      senderId: m.reply_to.sender_id,
+      sender: m.reply_to.sender,
+      roomId: m.reply_to.room_id,
+      createdAt: new Date(m.reply_to.created_at),
+    } : undefined,
+  }));
+
+  // Transform active room for chat header
+  const activeChatRoom = activeRoom ? {
+    id: activeRoom.id,
+    name: activeRoom.type === 'direct' 
+      ? activeRoom.members?.find(m => m.id !== user.id)?.username || 'Unknown'
+      : activeRoom.name,
+    description: activeRoom.description || undefined,
+    type: activeRoom.type as 'public' | 'private' | 'direct',
+    avatar: activeRoom.avatar_url || undefined,
+    members: activeRoom.members?.map(m => ({
+      id: m.id,
+      username: m.username,
+      avatar: m.avatar_url || undefined,
+      status: m.status as 'online' | 'offline' | 'away' | 'busy',
+    })) || [],
+    createdAt: new Date(activeRoom.created_at),
+  } : null;
+
+  // Transform friends for sidebar
+  const friendsList = friends.map(f => ({
+    id: f.friend.id,
+    username: f.friend.username,
+    avatar: f.friend.avatar_url || undefined,
+    status: f.friend.status as 'online' | 'offline' | 'away' | 'busy',
+  }));
+
   return (
-    <div className="h-screen flex overflow-hidden">
+    <div className="h-screen bg-background flex overflow-hidden">
       <Sidebar
+        rooms={sidebarRooms}
+        directMessages={directMessages}
         currentUser={currentUser}
-        rooms={mockRooms}
-        directMessages={mockDirectMessages}
-        activeRoomId={activeRoomId}
-        onRoomSelect={setActiveRoomId}
+        activeRoomId={activeRoomId || ''}
+        onSelectRoom={handleSelectRoom}
         onCreateRoom={handleCreateRoom}
+        onSignOut={signOut}
+        friends={friendsList}
+        pendingRequests={pendingRequests.map(p => ({
+          id: p.id,
+          friend: {
+            id: p.friend.id,
+            username: p.friend.username,
+            avatar: p.friend.avatar_url || undefined,
+            status: p.friend.status as 'online' | 'offline' | 'away' | 'busy',
+          }
+        }))}
+        onSendFriendRequest={sendFriendRequest}
+        onAcceptFriendRequest={acceptFriendRequest}
+        onRejectFriendRequest={rejectFriendRequest}
         onStartDM={handleStartDM}
-        onLogout={handleLogout}
       />
+      
       <ChatView
-        room={activeRoom}
-        messages={roomMessages}
-        currentUser={currentUser}
-        typingUsers={typingUsers}
+        room={activeChatRoom}
+        messages={chatMessages}
+        currentUserId={user.id}
+        typingUsers={[]}
         onSendMessage={handleSendMessage}
-        onTyping={handleTyping}
+        onReply={handleReply}
         onReact={handleReact}
-        onDeleteMessage={handleDeleteMessage}
+        onEditMessage={editMessage}
+        onDeleteMessage={deleteMessage}
+        replyingTo={replyingTo ? {
+          id: replyingTo.id,
+          content: replyingTo.content,
+          senderId: replyingTo.sender_id,
+          sender: {
+            id: replyingTo.sender.id,
+            username: replyingTo.sender.username,
+            avatar: replyingTo.sender.avatar_url || undefined,
+            status: replyingTo.sender.status as 'online' | 'offline' | 'away' | 'busy',
+          },
+          roomId: replyingTo.room_id,
+          createdAt: new Date(replyingTo.created_at),
+        } : undefined}
+        onCancelReply={() => setReplyingTo(null)}
+        isLoading={messagesLoading}
       />
     </div>
   );

@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { ChatRoom, User } from "@/types/chat";
 import { UserAvatar } from "./UserAvatar";
 import { 
   Phone, 
@@ -25,6 +24,23 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+interface User {
+  id: string;
+  username: string;
+  avatar?: string;
+  status: 'online' | 'offline' | 'away' | 'busy';
+}
+
+interface ChatRoom {
+  id: string;
+  name: string;
+  description?: string;
+  type: 'public' | 'private' | 'direct';
+  avatar?: string;
+  members: User[];
+  createdAt: Date;
+}
 
 interface ChatHeaderProps {
   room: ChatRoom;
