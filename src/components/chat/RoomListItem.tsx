@@ -1,7 +1,26 @@
 import { cn } from "@/lib/utils";
-import { ChatRoom } from "@/types/chat";
 import { UserAvatar } from "./UserAvatar";
-import { Hash, Lock, Users } from "lucide-react";
+import { Hash, Lock } from "lucide-react";
+
+interface User {
+  id: string;
+  username: string;
+  avatar?: string;
+  status: 'online' | 'offline' | 'away' | 'busy';
+}
+
+interface ChatRoom {
+  id: string;
+  name: string;
+  type: 'public' | 'private' | 'direct';
+  avatar?: string;
+  members: User[];
+  lastMessage?: {
+    content: string;
+    createdAt: Date;
+  };
+  unreadCount?: number;
+}
 
 interface RoomListItemProps {
   room: ChatRoom;
@@ -25,7 +44,7 @@ const formatLastMessageTime = (date?: Date): string => {
 
 export function RoomListItem({ room, isActive, onClick }: RoomListItemProps) {
   const isDirectMessage = room.type === 'direct';
-  const otherUser = isDirectMessage ? room.members.find(m => m.id !== 'current-user') : null;
+  const firstMember = room.members?.[0];
 
   return (
     <button
@@ -36,11 +55,11 @@ export function RoomListItem({ room, isActive, onClick }: RoomListItemProps) {
         isActive && 'bg-sidebar-accent'
       )}
     >
-      {isDirectMessage && otherUser ? (
+      {isDirectMessage && firstMember ? (
         <UserAvatar
-          src={otherUser.avatar}
-          username={otherUser.username}
-          status={otherUser.status}
+          src={room.avatar || firstMember.avatar}
+          username={room.name || firstMember.username}
+          status={firstMember.status}
           size="md"
         />
       ) : (
@@ -56,7 +75,7 @@ export function RoomListItem({ room, isActive, onClick }: RoomListItemProps) {
       <div className="flex-1 min-w-0 text-left">
         <div className="flex items-center justify-between gap-2">
           <span className="font-medium text-sm truncate">
-            {isDirectMessage && otherUser ? otherUser.username : room.name}
+            {room.name}
           </span>
           {room.lastMessage && (
             <span className="text-xs text-muted-foreground flex-shrink-0">
