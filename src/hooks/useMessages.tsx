@@ -22,6 +22,9 @@ export interface Message {
   sender: MessageProfile;
   reply_to?: Message;
   reactions: { emoji: string; users: string[] }[];
+  file_url?: string | null;
+  file_name?: string | null;
+  file_type?: string | null;
 }
 
 export const useMessages = (roomId: string | null) => {
@@ -138,16 +141,56 @@ export const useMessages = (roomId: string | null) => {
     };
   }, [roomId]);
 
-  const sendMessage = async (content: string, replyToId?: string) => {
+  const uploadFile = async (file: File): Promise<{ url: string; name: string; type: string } | null> => {
+    if (!user) return null;
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('chat-files')
+      .upload(fileName, file);
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      toast.error('Failed to upload file');
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('chat-files')
+      .getPublicUrl(fileName);
+
+    return { url: publicUrl, name: file.name, type: file.type };
+  };
+
+  const sendMessage = async (content: string, replyToId?: string, files?: File[]) => {
     if (!roomId || !user) return;
+
+    let fileUrl: string | null = null;
+    let fileName: string | null = null;
+    let fileType: string | null = null;
+
+    // Upload file if provided
+    if (files && files.length > 0) {
+      const uploaded = await uploadFile(files[0]);
+      if (uploaded) {
+        fileUrl = uploaded.url;
+        fileName = uploaded.name;
+        fileType = uploaded.type;
+      }
+    }
 
     const { error } = await supabase
       .from('messages')
       .insert({
         room_id: roomId,
         sender_id: user.id,
-        content,
+        content: content || (fileName ? `Sent a file: ${fileName}` : ''),
         reply_to_id: replyToId || null,
+        file_url: fileUrl,
+        file_name: fileName,
+        file_type: fileType,
       });
 
     if (error) {
