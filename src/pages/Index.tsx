@@ -40,8 +40,8 @@ const Index = () => {
     setReplyingTo(null);
   };
 
-  const handleSendMessage = async (content: string) => {
-    await sendMessage(content, replyingTo?.id);
+  const handleSendMessage = async (content: string, files?: File[]) => {
+    await sendMessage(content, replyingTo?.id, files);
     setReplyingTo(null);
   };
 
@@ -162,6 +162,15 @@ const Index = () => {
     updatedAt: m.updated_at ? new Date(m.updated_at) : undefined,
     isEdited: m.is_edited,
     reactions: m.reactions as { emoji: string; users: string[] }[],
+    attachments: m.file_url ? [{
+      id: m.id,
+      type: m.file_type?.startsWith('image/') ? 'image' as const : 
+            m.file_type?.startsWith('video/') ? 'video' as const : 'document' as const,
+      url: m.file_url,
+      name: m.file_name || 'file',
+      size: 0,
+      mimeType: m.file_type || '',
+    }] : undefined,
     replyTo: m.reply_to ? {
       id: m.reply_to.id,
       content: m.reply_to.content,

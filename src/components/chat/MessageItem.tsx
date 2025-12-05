@@ -60,31 +60,35 @@ const AttachmentPreview = ({ attachment }: { attachment: any }) => {
 
   if (attachment.type === 'image') {
     return (
-      <div className="mt-2 rounded-lg overflow-hidden max-w-xs">
+      <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="mt-2 rounded-lg overflow-hidden max-w-xs block">
         <img
           src={attachment.url}
           alt={attachment.name}
           className="w-full h-auto object-cover hover:opacity-90 transition-opacity cursor-pointer"
         />
-      </div>
+      </a>
     );
   }
 
   return (
-    <div className="mt-2 flex items-center gap-3 p-3 rounded-lg bg-muted/50 max-w-xs">
+    <a 
+      href={attachment.url} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      download={attachment.name}
+      className="mt-2 flex items-center gap-3 p-3 rounded-lg bg-muted/50 max-w-xs hover:bg-muted transition-colors"
+    >
       <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
         <Icon className="w-5 h-5 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{attachment.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {(attachment.size / 1024 / 1024).toFixed(2)} MB
-        </p>
+        <p className="text-xs text-muted-foreground">Click to download</p>
       </div>
-      <button className="p-2 hover:bg-muted rounded-lg transition-colors">
+      <div className="p-2">
         <Download className="w-4 h-4 text-muted-foreground" />
-      </button>
-    </div>
+      </div>
+    </a>
   );
 };
 

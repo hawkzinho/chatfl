@@ -21,6 +21,7 @@ interface Message {
   updatedAt?: Date;
   isEdited?: boolean;
   reactions?: { emoji: string; users: string[] }[];
+  attachments?: { id: string; type: 'image' | 'video' | 'document' | 'audio'; url: string; name: string; size: number; mimeType: string; }[];
   replyTo?: Message;
 }
 
