@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react';
 const Index = () => {
   const navigate = useNavigate();
   const { user, profile, loading: authLoading, signOut } = useAuth();
-  const { rooms, createRoom, refreshRooms } = useRooms();
+  const { rooms, createRoom, refreshRooms, joinByCode } = useRooms();
   const { friends, pendingRequests, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, startDirectMessage } = useFriendships();
   
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
@@ -75,6 +75,13 @@ const Index = () => {
     }
   };
 
+  const handleJoinByCode = async (code: string) => {
+    const roomId = await joinByCode(code);
+    if (roomId) {
+      setActiveRoomId(roomId);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
@@ -101,6 +108,7 @@ const Index = () => {
     description: r.description || undefined,
     type: r.type as 'public' | 'private' | 'direct',
     avatar: r.avatar_url || undefined,
+    inviteCode: r.invite_code || undefined,
     members: r.members?.map(m => ({
       id: m.id,
       username: m.username,
@@ -195,6 +203,7 @@ const Index = () => {
     description: activeRoom.description || undefined,
     type: activeRoom.type as 'public' | 'private' | 'direct',
     avatar: activeRoom.avatar_url || undefined,
+    inviteCode: activeRoom.invite_code || undefined,
     members: activeRoom.members?.map(m => ({
       id: m.id,
       username: m.username,
@@ -236,6 +245,7 @@ const Index = () => {
         onAcceptFriendRequest={acceptFriendRequest}
         onRejectFriendRequest={rejectFriendRequest}
         onStartDM={handleStartDM}
+        onJoinByCode={handleJoinByCode}
       />
       
       <ChatView

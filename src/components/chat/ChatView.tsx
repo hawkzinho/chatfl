@@ -31,6 +31,7 @@ interface ChatRoom {
   description?: string;
   type: 'public' | 'private' | 'direct';
   avatar?: string;
+  inviteCode?: string;
   members: User[];
   createdAt: Date;
 }

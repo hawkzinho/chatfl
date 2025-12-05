@@ -11,6 +11,7 @@ export interface Room {
   avatar_url: string | null;
   created_by: string | null;
   created_at: string;
+  invite_code: string | null;
   last_message?: {
     content: string;
     sender_username: string;
@@ -46,7 +47,8 @@ export const useRooms = () => {
           type,
           avatar_url,
           created_by,
-          created_at
+          created_at,
+          invite_code
         )
       `)
       .eq('user_id', user.id);
@@ -198,9 +200,58 @@ export const useRooms = () => {
     toast.success('Room deleted');
   };
 
+  const joinByCode = async (inviteCode: string) => {
+    if (!user) return null;
+
+    const code = inviteCode.trim().toUpperCase();
+    
+    const { data: room, error: findError } = await supabase
+      .from('chat_rooms')
+      .select('id, name')
+      .eq('invite_code', code)
+      .maybeSingle();
+
+    if (findError || !room) {
+      toast.error('Invalid invite code');
+      return null;
+    }
+
+    // Check if already a member
+    const { data: existing } = await supabase
+      .from('room_members')
+      .select('id')
+      .eq('room_id', room.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (existing) {
+      toast.info('You are already in this room');
+      return room.id;
+    }
+
+    const { error } = await supabase
+      .from('room_members')
+      .insert({
+        room_id: room.id,
+        user_id: user.id,
+        role: 'member',
+      });
+
+    if (error) {
+      toast.error('Failed to join room');
+      console.error(error);
+      return null;
+    }
+
+    await fetchRooms();
+    toast.success(`Joined ${room.name}!`);
+    return room.id;
+  };
+
   return {
     rooms,
     loading,
+    joinByCode,
     createRoom,
     joinRoom,
     leaveRoom,
