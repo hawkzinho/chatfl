@@ -21,6 +21,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
+          invite_code: string | null
           name: string
           type: string | null
           updated_at: string | null
@@ -31,6 +32,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          invite_code?: string | null
           name: string
           type?: string | null
           updated_at?: string | null
@@ -41,6 +43,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          invite_code?: string | null
           name?: string
           type?: string | null
           updated_at?: string | null
@@ -328,7 +331,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_invite_code: { Args: never; Returns: string }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"

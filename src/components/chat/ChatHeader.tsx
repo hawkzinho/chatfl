@@ -10,7 +10,8 @@ import {
   Users,
   Settings,
   Hash,
-  Lock
+  Lock,
+  Copy
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -24,6 +25,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { toast } from "sonner";
 
 interface User {
   id: string;
@@ -38,6 +40,7 @@ interface ChatRoom {
   description?: string;
   type: 'public' | 'private' | 'direct';
   avatar?: string;
+  inviteCode?: string;
   members: User[];
   createdAt: Date;
 }
@@ -65,6 +68,13 @@ export function ChatHeader({
     : null;
 
   const onlineMembers = room.members.filter((m) => m.status === 'online').length;
+
+  const copyInviteCode = () => {
+    if (room.inviteCode) {
+      navigator.clipboard.writeText(room.inviteCode);
+      toast.success('Invite code copied! Share it with friends to join.');
+    }
+  };
 
   return (
     <div className="h-16 flex items-center justify-between px-4 border-b border-border bg-card/50 backdrop-blur-sm">
@@ -99,6 +109,20 @@ export function ChatHeader({
                 {onlineMembers} of {room.members.length} online
               </p>
             </div>
+            {room.inviteCode && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={copyInviteCode}
+                    className="ml-2 px-2 py-1 rounded-md bg-primary/10 hover:bg-primary/20 transition-colors flex items-center gap-1.5"
+                  >
+                    <span className="text-xs font-mono font-semibold text-primary">{room.inviteCode}</span>
+                    <Copy className="w-3 h-3 text-primary" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Click to copy invite code</TooltipContent>
+              </Tooltip>
+            )}
           </>
         )}
       </div>

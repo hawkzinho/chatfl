@@ -13,7 +13,9 @@ import {
   UserPlus,
   Check,
   X,
-  MessageSquare
+  MessageSquare,
+  Link,
+  Copy
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -53,6 +55,7 @@ interface ChatRoom {
   description?: string;
   type: 'public' | 'private' | 'direct';
   avatar?: string;
+  inviteCode?: string;
   members: User[];
   lastMessage?: any;
   unreadCount?: number;
@@ -78,6 +81,7 @@ interface SidebarProps {
   onAcceptFriendRequest?: (requestId: string) => void;
   onRejectFriendRequest?: (requestId: string) => void;
   onStartDM?: (friendId: string) => void;
+  onJoinByCode?: (code: string) => void;
 }
 
 export function Sidebar({
@@ -94,6 +98,7 @@ export function Sidebar({
   onAcceptFriendRequest,
   onRejectFriendRequest,
   onStartDM,
+  onJoinByCode,
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [roomsOpen, setRoomsOpen] = useState(true);
@@ -101,9 +106,11 @@ export function Sidebar({
   const [friendsOpen, setFriendsOpen] = useState(true);
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [addFriendOpen, setAddFriendOpen] = useState(false);
+  const [joinRoomOpen, setJoinRoomOpen] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomDescription, setNewRoomDescription] = useState('');
   const [friendUsername, setFriendUsername] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
 
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -132,6 +139,21 @@ export function Sidebar({
     onSendFriendRequest?.(friendUsername);
     setFriendUsername('');
     setAddFriendOpen(false);
+  };
+
+  const handleJoinByCode = () => {
+    if (!inviteCode.trim()) {
+      toast.error('Invite code is required');
+      return;
+    }
+    onJoinByCode?.(inviteCode);
+    setInviteCode('');
+    setJoinRoomOpen(false);
+  };
+
+  const copyInviteCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast.success('Invite code copied!');
   };
 
   return (
@@ -210,7 +232,7 @@ export function Sidebar({
             </CollapsibleTrigger>
             <Dialog open={createRoomOpen} onOpenChange={setCreateRoomOpen}>
               <DialogTrigger asChild>
-                <button className="p-1 rounded-md hover:bg-sidebar-accent transition-colors">
+                <button className="p-1 rounded-md hover:bg-sidebar-accent transition-colors" title="Create channel">
                   <Plus className="w-4 h-4 text-muted-foreground" />
                 </button>
               </DialogTrigger>
@@ -246,6 +268,36 @@ export function Sidebar({
                 </div>
               </DialogContent>
             </Dialog>
+            <Dialog open={joinRoomOpen} onOpenChange={setJoinRoomOpen}>
+              <DialogTrigger asChild>
+                <button className="p-1 rounded-md hover:bg-sidebar-accent transition-colors" title="Join with code">
+                  <Link className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Join a channel</DialogTitle>
+                  <DialogDescription>
+                    Enter an invite code to join a channel
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="invite-code">Invite Code</Label>
+                    <Input
+                      id="invite-code"
+                      placeholder="ABC12345"
+                      value={inviteCode}
+                      onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                      className="uppercase tracking-wider font-mono"
+                    />
+                  </div>
+                  <Button onClick={handleJoinByCode} className="w-full">
+                    Join Channel
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
           <CollapsibleContent className="space-y-1">
             {filteredRooms.length === 0 ? (
@@ -254,12 +306,25 @@ export function Sidebar({
               </p>
             ) : (
               filteredRooms.map((room) => (
-                <RoomListItem
-                  key={room.id}
-                  room={room}
-                  isActive={room.id === activeRoomId}
-                  onClick={() => onSelectRoom(room.id)}
-                />
+                <div key={room.id} className="group relative">
+                  <RoomListItem
+                    room={room}
+                    isActive={room.id === activeRoomId}
+                    onClick={() => onSelectRoom(room.id)}
+                  />
+                  {room.inviteCode && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyInviteCode(room.inviteCode!);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-sidebar-accent/80 hover:bg-sidebar-accent opacity-0 group-hover:opacity-100 transition-opacity"
+                      title={`Copy invite code: ${room.inviteCode}`}
+                    >
+                      <Copy className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
               ))
             )}
           </CollapsibleContent>
