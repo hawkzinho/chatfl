@@ -166,7 +166,12 @@ const Index = () => {
       id: m.reply_to.id,
       content: m.reply_to.content,
       senderId: m.reply_to.sender_id,
-      sender: m.reply_to.sender,
+      sender: {
+        id: m.reply_to.sender.id,
+        username: m.reply_to.sender.username,
+        avatar: m.reply_to.sender.avatar_url || undefined,
+        status: m.reply_to.sender.status as 'online' | 'offline' | 'away' | 'busy',
+      },
       roomId: m.reply_to.room_id,
       createdAt: new Date(m.reply_to.created_at),
     } : undefined,
