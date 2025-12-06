@@ -15,7 +15,9 @@ import {
   Copy,
   Hash,
   Sparkles,
-  Bell
+  Bell,
+  Trash2,
+  MoreHorizontal
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -48,6 +50,10 @@ interface User {
   status: 'online' | 'offline' | 'away' | 'busy';
 }
 
+interface Friend extends User {
+  friendshipId?: string;
+}
+
 interface ChatRoom {
   id: string;
   name: string;
@@ -55,6 +61,7 @@ interface ChatRoom {
   type: 'public' | 'private' | 'direct';
   avatar?: string;
   inviteCode?: string;
+  createdBy?: string;
   members: User[];
   lastMessage?: any;
   unreadCount?: number;
@@ -74,13 +81,18 @@ interface SidebarProps {
   onSelectRoom: (roomId: string) => void;
   onCreateRoom?: (name: string, description?: string) => void;
   onSignOut?: () => void;
-  friends?: User[];
+  friends?: Friend[];
   pendingRequests?: PendingRequest[];
   onSendFriendRequest?: (username: string) => void;
   onAcceptFriendRequest?: (requestId: string) => void;
   onRejectFriendRequest?: (requestId: string) => void;
+  onRemoveFriend?: (friendshipId: string) => void;
   onStartDM?: (friendId: string) => void;
   onJoinByCode?: (code: string) => void;
+  onDeleteRoom?: (roomId: string) => Promise<void>;
+  onLeaveRoom?: (roomId: string) => Promise<void>;
+  onUpdateRoom?: (roomId: string, name: string, description: string) => Promise<void>;
+  onRegenerateCode?: (roomId: string) => Promise<void>;
 }
 
 export function Sidebar({
@@ -96,8 +108,11 @@ export function Sidebar({
   onSendFriendRequest,
   onAcceptFriendRequest,
   onRejectFriendRequest,
+  onRemoveFriend,
   onStartDM,
   onJoinByCode,
+  onDeleteRoom,
+  onLeaveRoom,
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [roomsOpen, setRoomsOpen] = useState(true);
@@ -153,6 +168,18 @@ export function Sidebar({
   const copyInviteCode = (code: string) => {
     navigator.clipboard.writeText(code);
     toast.success('Invite code copied!');
+  };
+
+  const handleRemoveFriend = (friendshipId: string, username: string) => {
+    if (confirm(`Remove ${username} from your friends?`)) {
+      onRemoveFriend?.(friendshipId);
+    }
+  };
+
+  const handleDeleteDM = async (roomId: string) => {
+    if (confirm('Delete this conversation?')) {
+      await onLeaveRoom?.(roomId);
+    }
   };
 
   return (
@@ -373,12 +400,23 @@ export function Sidebar({
               </div>
             ) : (
               filteredDMs.map((dm) => (
-                <RoomListItem
-                  key={dm.id}
-                  room={dm}
-                  isActive={dm.id === activeRoomId}
-                  onClick={() => onSelectRoom(dm.id)}
-                />
+                <div key={dm.id} className="group relative">
+                  <RoomListItem
+                    room={dm}
+                    isActive={dm.id === activeRoomId}
+                    onClick={() => onSelectRoom(dm.id)}
+                  />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteDM(dm.id);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-destructive/10 hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-all"
+                    title="Delete conversation"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                  </button>
+                </div>
               ))
             )}
           </CollapsibleContent>
@@ -439,28 +477,50 @@ export function Sidebar({
               </div>
             ) : (
               friends.map((friend) => (
-                <button
-                  key={friend.id}
-                  onClick={() => onStartDM?.(friend.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-muted/30 transition-all group hover-lift"
-                >
-                  <UserAvatar
-                    src={friend.avatar}
-                    username={friend.username}
-                    status={friend.status}
-                    size="sm"
-                  />
-                  <div className="flex-1 text-left min-w-0">
-                    <span className="text-sm font-medium truncate block">{friend.username}</span>
-                    <span className={cn(
-                      "text-xs capitalize",
-                      friend.status === 'online' ? 'text-status-online' : 'text-muted-foreground'
-                    )}>
-                      {friend.status}
-                    </span>
-                  </div>
-                  <MessageSquare className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
+                <div key={friend.id} className="group relative">
+                  <button
+                    onClick={() => onStartDM?.(friend.id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-muted/30 transition-all hover-lift"
+                  >
+                    <UserAvatar
+                      src={friend.avatar}
+                      username={friend.username}
+                      status={friend.status}
+                      size="sm"
+                    />
+                    <div className="flex-1 text-left min-w-0">
+                      <span className="text-sm font-medium truncate block">{friend.username}</span>
+                      <span className={cn(
+                        "text-xs capitalize",
+                        friend.status === 'online' ? 'text-status-online' : 'text-muted-foreground'
+                      )}>
+                        {friend.status}
+                      </span>
+                    </div>
+                    <MessageSquare className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                  {friend.friendshipId && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-muted opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem 
+                          onClick={() => handleRemoveFriend(friend.friendshipId!, friend.username)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Remove Friend
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               ))
             )}
           </CollapsibleContent>
