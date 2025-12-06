@@ -5,6 +5,8 @@ import { useRooms } from '@/hooks/useRooms';
 import { useMessages, Message } from '@/hooks/useMessages';
 import { useFriendships } from '@/hooks/useFriendships';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
+import { useRoomInvites } from '@/hooks/useRoomInvites';
+import { useNotifications } from '@/hooks/useNotifications';
 import { Sidebar } from '@/components/chat/Sidebar';
 import { ChatView } from '@/components/chat/ChatView';
 import { Loader2 } from 'lucide-react';
@@ -14,12 +16,16 @@ const Index = () => {
   const { user, profile, loading: authLoading, signOut } = useAuth();
   const { rooms, createRoom, refreshRooms, joinByCode, deleteRoom, updateRoom, regenerateInviteCode, leaveRoom } = useRooms();
   const { friends, pendingRequests, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, removeFriend, startDirectMessage } = useFriendships();
+  const { pendingInvites, sendInvite, acceptInvite, rejectInvite } = useRoomInvites();
   
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   
   const { messages, loading: messagesLoading, sendMessage, editMessage, deleteMessage, addReaction, removeReaction } = useMessages(activeRoomId);
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(activeRoomId);
+  
+  // Initialize notifications (sound and browser notifications)
+  useNotifications(activeRoomId);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -99,10 +105,25 @@ const Index = () => {
     }
   };
 
+  const handleInviteAccepted = async (roomId: string) => {
+    await refreshRooms();
+    setActiveRoomId(roomId);
+  };
+
+  const handleSendRoomInvite = async (friendId: string) => {
+    if (!activeRoomId) return false;
+    return await sendInvite(activeRoomId, friendId);
+  };
+
   if (authLoading) {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center glow animate-pulse">
+            <Loader2 className="w-8 h-8 animate-spin text-primary-foreground" />
+          </div>
+          <p className="text-muted-foreground animate-pulse">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -264,6 +285,7 @@ const Index = () => {
             status: p.friend.status as 'online' | 'offline' | 'away' | 'busy',
           }
         }))}
+        roomInvites={pendingInvites}
         onSendFriendRequest={sendFriendRequest}
         onAcceptFriendRequest={acceptFriendRequest}
         onRejectFriendRequest={rejectFriendRequest}
@@ -274,6 +296,9 @@ const Index = () => {
         onLeaveRoom={handleLeaveRoom}
         onUpdateRoom={updateRoom}
         onRegenerateCode={regenerateInviteCode}
+        onAcceptRoomInvite={acceptInvite}
+        onRejectRoomInvite={rejectInvite}
+        onRoomInviteAccepted={handleInviteAccepted}
       />
       
       <ChatView
@@ -306,6 +331,8 @@ const Index = () => {
         onLeaveRoom={handleLeaveRoom}
         onUpdateRoom={updateRoom}
         onRegenerateCode={regenerateInviteCode}
+        friends={friendsList}
+        onInviteFriend={handleSendRoomInvite}
       />
     </div>
   );
