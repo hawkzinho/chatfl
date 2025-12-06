@@ -90,20 +90,21 @@ export function MessageInput({
   };
 
   return (
-    <div className="p-4 border-t border-border bg-card/50">
+    <div className="p-4 border-t border-border/50 glass-strong relative z-10">
       {/* Reply Preview */}
       {replyTo && (
-        <div className="flex items-center gap-2 mb-3 p-3 rounded-xl bg-muted/50 border border-border animate-slide-in">
+        <div className="flex items-center gap-3 mb-3 p-3 rounded-xl bg-primary/5 border border-primary/20 animate-slide-in">
+          <div className="w-1 h-10 rounded-full bg-gradient-primary" />
           <Reply className="w-4 h-4 text-primary flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <span className="text-xs text-primary font-medium">
+            <span className="text-xs text-primary font-semibold">
               Replying to {replyTo.sender.username}
             </span>
             <p className="text-sm text-muted-foreground truncate">{replyTo.content}</p>
           </div>
           <button
             onClick={onCancelReply}
-            className="p-1.5 hover:bg-muted rounded-lg transition-colors"
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
           >
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -112,11 +113,11 @@ export function MessageInput({
 
       {/* Attachments Preview */}
       {attachments.length > 0 && (
-        <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
+        <div className="flex gap-3 mb-3 overflow-x-auto pb-2">
           {attachments.map((file, index) => (
             <div
               key={index}
-              className="relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-muted border border-border animate-bounce-in"
+              className="relative flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-muted/50 border border-border/50 animate-bounce-in"
             >
               {file.type.startsWith('image/') ? (
                 <img
@@ -126,17 +127,17 @@ export function MessageInput({
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center p-2">
-                  <FileText className="w-6 h-6 text-muted-foreground mb-1" />
+                  <FileText className="w-8 h-8 text-muted-foreground mb-1" />
                   <span className="text-xs text-muted-foreground truncate w-full text-center">
-                    {file.name.slice(0, 10)}
+                    {file.name.slice(0, 12)}
                   </span>
                 </div>
               )}
               <button
                 onClick={() => removeAttachment(index)}
-                className="absolute -top-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center shadow-lg"
+                className="absolute -top-1 -right-1 w-6 h-6 bg-destructive rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
               >
-                <X className="w-3 h-3 text-destructive-foreground" />
+                <X className="w-3.5 h-3.5 text-destructive-foreground" />
               </button>
             </div>
           ))}
@@ -145,14 +146,14 @@ export function MessageInput({
 
       {/* Input Area */}
       <div className="flex items-end gap-3">
-        <div className="flex-1 flex items-end gap-2 p-3 rounded-2xl bg-muted/30 border border-border focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+        <div className="flex-1 flex items-end gap-2 p-4 rounded-2xl bg-muted/20 border border-border/50 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
           {/* Attachment Button */}
           <DropdownMenu>
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                    className="p-2 rounded-xl hover:bg-muted/50 transition-colors"
                     disabled={disabled}
                   >
                     <Paperclip className="w-5 h-5 text-muted-foreground" />
@@ -161,7 +162,7 @@ export function MessageInput({
               </TooltipTrigger>
               <TooltipContent>Attach file</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="start">
+            <DropdownMenuContent align="start" className="glass-strong">
               <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
                 <ImageIcon className="w-4 h-4 mr-2" />
                 Photo or Video
@@ -204,7 +205,7 @@ export function MessageInput({
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                    className="p-2 rounded-xl hover:bg-muted/50 transition-colors"
                     disabled={disabled}
                   >
                     <Smile className="w-5 h-5 text-muted-foreground" />
@@ -213,12 +214,12 @@ export function MessageInput({
               </TooltipTrigger>
               <TooltipContent>Emoji</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="end" className="grid grid-cols-5 gap-1 p-2">
+            <DropdownMenuContent align="end" className="grid grid-cols-5 gap-1 p-3 glass-strong">
               {quickEmojis.map((emoji) => (
                 <button
                   key={emoji}
                   onClick={() => insertEmoji(emoji)}
-                  className="p-2 hover:bg-muted rounded-lg transition-colors text-xl hover:scale-110"
+                  className="p-2 hover:bg-muted rounded-xl transition-all text-xl hover:scale-125"
                 >
                   {emoji}
                 </button>
@@ -234,10 +235,10 @@ export function MessageInput({
               onClick={handleSend}
               disabled={disabled || (!content.trim() && attachments.length === 0)}
               className={cn(
-                'p-3.5 rounded-2xl transition-all',
+                'p-4 rounded-2xl transition-all duration-300',
                 content.trim() || attachments.length > 0
-                  ? 'bg-primary text-primary-foreground glow hover:opacity-90 scale-100'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80 scale-95 opacity-50'
+                  ? 'bg-gradient-primary text-primary-foreground glow hover:opacity-90 scale-100'
+                  : 'bg-muted/50 text-muted-foreground scale-95 opacity-50'
               )}
             >
               <Send className="w-5 h-5" />
