@@ -46,6 +46,13 @@ interface ChatRoom {
   createdAt: Date;
 }
 
+interface Friend {
+  id: string;
+  username: string;
+  avatar?: string;
+  status: 'online' | 'offline' | 'away' | 'busy';
+}
+
 interface ChatViewProps {
   room: ChatRoom | null;
   messages: Message[];
@@ -64,6 +71,8 @@ interface ChatViewProps {
   onLeaveRoom?: (roomId: string) => Promise<void>;
   onUpdateRoom?: (roomId: string, name: string, description: string) => Promise<void>;
   onRegenerateCode?: (roomId: string) => Promise<void>;
+  friends?: Friend[];
+  onInviteFriend?: (friendId: string) => void;
 }
 
 export function ChatView({
@@ -84,6 +93,8 @@ export function ChatView({
   onLeaveRoom,
   onUpdateRoom,
   onRegenerateCode,
+  friends = [],
+  onInviteFriend,
 }: ChatViewProps) {
   const handleSend = useCallback(
     (content: string, attachments?: File[]) => {
