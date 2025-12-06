@@ -8,7 +8,6 @@ import {
   X, 
   Image as ImageIcon,
   FileText,
-  Mic,
   Reply
 } from "lucide-react";
 import {
@@ -91,11 +90,11 @@ export function MessageInput({
   };
 
   return (
-    <div className="p-4 border-t border-border">
+    <div className="p-4 border-t border-border bg-card/50">
       {/* Reply Preview */}
       {replyTo && (
-        <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-muted/50 animate-slide-in">
-          <Reply className="w-4 h-4 text-primary" />
+        <div className="flex items-center gap-2 mb-3 p-3 rounded-xl bg-muted/50 border border-border animate-slide-in">
+          <Reply className="w-4 h-4 text-primary flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <span className="text-xs text-primary font-medium">
               Replying to {replyTo.sender.username}
@@ -104,7 +103,7 @@ export function MessageInput({
           </div>
           <button
             onClick={onCancelReply}
-            className="p-1 hover:bg-muted rounded-md transition-colors"
+            className="p-1.5 hover:bg-muted rounded-lg transition-colors"
           >
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -117,7 +116,7 @@ export function MessageInput({
           {attachments.map((file, index) => (
             <div
               key={index}
-              className="relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-muted animate-bounce-in"
+              className="relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-muted border border-border animate-bounce-in"
             >
               {file.type.startsWith('image/') ? (
                 <img
@@ -145,8 +144,8 @@ export function MessageInput({
       )}
 
       {/* Input Area */}
-      <div className="flex items-end gap-2">
-        <div className="flex-1 flex items-end gap-2 p-3 rounded-2xl bg-muted/50 border border-border focus-within:border-primary/50 transition-colors">
+      <div className="flex items-end gap-3">
+        <div className="flex-1 flex items-end gap-2 p-3 rounded-2xl bg-muted/30 border border-border focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
           {/* Attachment Button */}
           <DropdownMenu>
             <Tooltip>
@@ -219,7 +218,7 @@ export function MessageInput({
                 <button
                   key={emoji}
                   onClick={() => insertEmoji(emoji)}
-                  className="p-2 hover:bg-muted rounded-md transition-colors text-xl hover:scale-110"
+                  className="p-2 hover:bg-muted rounded-lg transition-colors text-xl hover:scale-110"
                 >
                   {emoji}
                 </button>
@@ -228,29 +227,23 @@ export function MessageInput({
           </DropdownMenu>
         </div>
 
-        {/* Send/Voice Button */}
+        {/* Send Button */}
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               onClick={handleSend}
               disabled={disabled || (!content.trim() && attachments.length === 0)}
               className={cn(
-                'p-3 rounded-2xl transition-all',
+                'p-3.5 rounded-2xl transition-all',
                 content.trim() || attachments.length > 0
-                  ? 'bg-primary text-primary-foreground glow hover:opacity-90'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  ? 'bg-primary text-primary-foreground glow hover:opacity-90 scale-100'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80 scale-95 opacity-50'
               )}
             >
-              {content.trim() || attachments.length > 0 ? (
-                <Send className="w-5 h-5" />
-              ) : (
-                <Mic className="w-5 h-5" />
-              )}
+              <Send className="w-5 h-5" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>
-            {content.trim() || attachments.length > 0 ? 'Send' : 'Voice message'}
-          </TooltipContent>
+          <TooltipContent>Send message</TooltipContent>
         </Tooltip>
       </div>
     </div>
