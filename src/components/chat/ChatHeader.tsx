@@ -1,23 +1,15 @@
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "./UserAvatar";
 import { 
-  Phone, 
-  Video, 
-  Search, 
-  MoreVertical,
-  Pin,
-  Bell,
-  Users,
-  Settings,
   Hash,
-  Lock,
-  Copy
+  Users,
+  Copy,
+  MoreVertical
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -47,166 +39,97 @@ interface ChatRoom {
 
 interface ChatHeaderProps {
   room: ChatRoom;
-  currentUserId: string;
-  onSearch?: () => void;
-  onCall?: () => void;
-  onVideoCall?: () => void;
-  onViewMembers?: () => void;
+  currentUserId?: string;
 }
 
-export function ChatHeader({
-  room,
-  currentUserId,
-  onSearch,
-  onCall,
-  onVideoCall,
-  onViewMembers,
-}: ChatHeaderProps) {
+export function ChatHeader({ room, currentUserId }: ChatHeaderProps) {
   const isDirectMessage = room.type === 'direct';
-  const otherUser = isDirectMessage
-    ? room.members.find((m) => m.id !== currentUserId)
-    : null;
-
-  const onlineMembers = room.members.filter((m) => m.status === 'online').length;
+  const otherUser = isDirectMessage ? room.members.find(m => m.id !== currentUserId) || room.members[0] : null;
+  const onlineMembers = room.members.filter(m => m.status === 'online').length;
 
   const copyInviteCode = () => {
     if (room.inviteCode) {
       navigator.clipboard.writeText(room.inviteCode);
-      toast.success('Invite code copied! Share it with friends to join.');
+      toast.success('Invite code copied!');
     }
   };
 
   return (
-    <div className="h-16 flex items-center justify-between px-4 border-b border-border bg-card/50 backdrop-blur-sm">
-      <div className="flex items-center gap-3">
+    <div className="h-16 px-4 flex items-center justify-between border-b border-border bg-card/50 backdrop-blur-sm">
+      <div className="flex items-center gap-3 min-w-0">
         {isDirectMessage && otherUser ? (
-          <>
-            <UserAvatar
-              src={otherUser.avatar}
-              username={otherUser.username}
-              status={otherUser.status}
-              size="md"
-            />
-            <div>
-              <h2 className="font-semibold text-foreground">{otherUser.username}</h2>
-              <p className="text-xs text-muted-foreground capitalize">
-                {otherUser.status === 'online' ? 'Online' : `Last seen recently`}
-              </p>
-            </div>
-          </>
+          <UserAvatar
+            src={otherUser.avatar}
+            username={otherUser.username}
+            status={otherUser.status}
+            size="md"
+          />
         ) : (
-          <>
-            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-              {room.type === 'private' ? (
-                <Lock className="w-5 h-5 text-muted-foreground" />
-              ) : (
-                <Hash className="w-5 h-5 text-muted-foreground" />
-              )}
-            </div>
-            <div>
-              <h2 className="font-semibold text-foreground">{room.name}</h2>
-              <p className="text-xs text-muted-foreground">
-                {onlineMembers} of {room.members.length} online
-              </p>
-            </div>
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Hash className="w-5 h-5 text-primary" />
+          </div>
+        )}
+        
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className="font-semibold text-foreground truncate">
+              {room.name}
+            </h2>
             {room.inviteCode && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     onClick={copyInviteCode}
-                    className="ml-2 px-2 py-1 rounded-md bg-primary/10 hover:bg-primary/20 transition-colors flex items-center gap-1.5"
+                    className="px-2 py-0.5 text-xs font-mono bg-muted rounded-md hover:bg-muted/80 transition-colors flex items-center gap-1"
                   >
-                    <span className="text-xs font-mono font-semibold text-primary">{room.inviteCode}</span>
-                    <Copy className="w-3 h-3 text-primary" />
+                    <span className="text-muted-foreground">{room.inviteCode}</span>
+                    <Copy className="w-3 h-3 text-muted-foreground" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Click to copy invite code</TooltipContent>
+                <TooltipContent>Copy invite code</TooltipContent>
               </Tooltip>
             )}
-          </>
-        )}
+          </div>
+          {isDirectMessage && otherUser ? (
+            <p className={cn(
+              "text-xs capitalize",
+              otherUser.status === 'online' ? 'text-green-400' : 'text-muted-foreground'
+            )}>
+              {otherUser.status}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {room.description || `${room.members.length} members • ${onlineMembers} online`}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center gap-1">
-        {isDirectMessage && (
-          <>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onCall}
-                  className="p-2 rounded-lg hover:bg-muted transition-colors"
-                >
-                  <Phone className="w-5 h-5 text-muted-foreground" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Voice call</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onVideoCall}
-                  className="p-2 rounded-lg hover:bg-muted transition-colors"
-                >
-                  <Video className="w-5 h-5 text-muted-foreground" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Video call</TooltipContent>
-            </Tooltip>
-          </>
-        )}
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={onSearch}
-              className="p-2 rounded-lg hover:bg-muted transition-colors"
-            >
-              <Search className="w-5 h-5 text-muted-foreground" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Search in chat</TooltipContent>
-        </Tooltip>
-
+      <div className="flex items-center gap-2">
         {!isDirectMessage && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <button
-                onClick={onViewMembers}
-                className="p-2 rounded-lg hover:bg-muted transition-colors"
-              >
+              <button className="p-2 rounded-xl hover:bg-muted transition-colors">
                 <Users className="w-5 h-5 text-muted-foreground" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>View members</TooltipContent>
+            <TooltipContent>{room.members.length} members</TooltipContent>
           </Tooltip>
         )}
 
         <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <button className="p-2 rounded-lg hover:bg-muted transition-colors">
-                  <MoreVertical className="w-5 h-5 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent>More options</TooltipContent>
-          </Tooltip>
+          <DropdownMenuTrigger asChild>
+            <button className="p-2 rounded-xl hover:bg-muted transition-colors">
+              <MoreVertical className="w-5 h-5 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>
-              <Pin className="w-4 h-4 mr-2" />
-              Pin conversation
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Bell className="w-4 h-4 mr-2" />
-              Mute notifications
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Settings className="w-4 h-4 mr-2" />
-              Chat settings
-            </DropdownMenuItem>
+            {room.inviteCode && (
+              <DropdownMenuItem onClick={copyInviteCode}>
+                <Copy className="w-4 h-4 mr-2" />
+                Copy Invite Code
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

@@ -9,11 +9,7 @@ import {
   Smile, 
   Pencil, 
   Trash2,
-  Check,
-  CheckCheck,
-  Image as ImageIcon,
   FileText,
-  Film,
   Download
 } from "lucide-react";
 import {
@@ -39,7 +35,7 @@ interface MessageItemProps {
   onReact?: (messageId: string, emoji: string) => void;
 }
 
-const quickEmojis = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+const quickEmojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥'];
 
 const formatTime = (date: Date): string => {
   return new Intl.DateTimeFormat('en-US', {
@@ -50,21 +46,14 @@ const formatTime = (date: Date): string => {
 };
 
 const AttachmentPreview = ({ attachment }: { attachment: any }) => {
-  const icons = {
-    image: ImageIcon,
-    video: Film,
-    document: FileText,
-    audio: FileText,
-  };
-  const Icon = icons[attachment.type as keyof typeof icons] || FileText;
-
   if (attachment.type === 'image') {
     return (
-      <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="mt-2 rounded-lg overflow-hidden max-w-xs block">
+      <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="mt-2 rounded-xl overflow-hidden max-w-xs block">
         <img
           src={attachment.url}
           alt={attachment.name}
           className="w-full h-auto object-cover hover:opacity-90 transition-opacity cursor-pointer"
+          loading="lazy"
         />
       </a>
     );
@@ -76,18 +65,16 @@ const AttachmentPreview = ({ attachment }: { attachment: any }) => {
       target="_blank" 
       rel="noopener noreferrer"
       download={attachment.name}
-      className="mt-2 flex items-center gap-3 p-3 rounded-lg bg-muted/50 max-w-xs hover:bg-muted transition-colors"
+      className="mt-2 flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border max-w-xs hover:bg-muted transition-colors"
     >
       <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-        <Icon className="w-5 h-5 text-primary" />
+        <FileText className="w-5 h-5 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{attachment.name}</p>
         <p className="text-xs text-muted-foreground">Click to download</p>
       </div>
-      <div className="p-2">
-        <Download className="w-4 h-4 text-muted-foreground" />
-      </div>
+      <Download className="w-4 h-4 text-muted-foreground" />
     </a>
   );
 };
@@ -111,7 +98,7 @@ export function MessageItem({
   return (
     <div
       className={cn(
-        'group flex gap-3 px-4 py-1.5 hover:bg-muted/30 transition-colors animate-fade-in',
+        'group flex gap-3 px-4 py-2 hover:bg-muted/30 transition-colors animate-fade-in',
         isOwn && 'flex-row-reverse'
       )}
       onMouseEnter={() => setShowActions(true)}
@@ -136,7 +123,7 @@ export function MessageItem({
               {formatTime(message.createdAt)}
             </span>
             {message.isEdited && (
-              <span className="text-xs text-muted-foreground italic">(edited)</span>
+              <span className="text-xs text-muted-foreground/70">(edited)</span>
             )}
           </div>
         )}
@@ -145,8 +132,8 @@ export function MessageItem({
           className={cn(
             'relative rounded-2xl px-4 py-2.5',
             isOwn
-              ? 'bg-message-own text-foreground rounded-br-md'
-              : 'bg-message-other text-foreground rounded-bl-md'
+              ? 'bg-primary text-primary-foreground rounded-br-md'
+              : 'bg-muted rounded-bl-md'
           )}
         >
           {message.replyTo && (
@@ -163,17 +150,6 @@ export function MessageItem({
           {message.attachments?.map((attachment) => (
             <AttachmentPreview key={attachment.id} attachment={attachment} />
           ))}
-
-          {/* Read receipts */}
-          {isOwn && (
-            <div className="flex justify-end mt-1">
-              {message.readBy && message.readBy.length > 0 ? (
-                <CheckCheck className="w-4 h-4 text-primary" />
-              ) : (
-                <Check className="w-4 h-4 text-muted-foreground" />
-              )}
-            </div>
-          )}
         </div>
 
         <MessageReactions
@@ -219,7 +195,7 @@ export function MessageItem({
               <button
                 key={emoji}
                 onClick={() => handleReact(emoji)}
-                className="p-1.5 hover:bg-muted rounded-md transition-colors text-lg hover:scale-110"
+                className="p-1.5 hover:bg-muted rounded-lg transition-colors text-lg hover:scale-110"
               >
                 {emoji}
               </button>
@@ -227,25 +203,23 @@ export function MessageItem({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <button className="p-1.5 rounded-lg hover:bg-muted transition-colors">
-                  <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent>More</TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent align={isOwn ? 'start' : 'end'}>
-            {isOwn && (
+        {isOwn && (
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+                    <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>More</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align={isOwn ? 'start' : 'end'}>
               <DropdownMenuItem onClick={() => onEdit?.(message)}>
                 <Pencil className="w-4 h-4 mr-2" />
                 Edit
               </DropdownMenuItem>
-            )}
-            {isOwn && (
               <DropdownMenuItem
                 onClick={() => onDelete?.(message)}
                 className="text-destructive focus:text-destructive"
@@ -253,9 +227,9 @@ export function MessageItem({
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
               </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );

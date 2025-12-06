@@ -5,23 +5,20 @@ import { UserAvatar } from "./UserAvatar";
 import { 
   Search, 
   Plus, 
-  Settings,
-  Users,
   ChevronDown,
-  Bell,
   LogOut,
   UserPlus,
   Check,
   X,
   MessageSquare,
   Link,
-  Copy
+  Copy,
+  Hash
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -157,13 +154,13 @@ export function Sidebar({
   };
 
   return (
-    <div className="w-72 h-full flex flex-col bg-sidebar border-r border-sidebar-border">
+    <div className="w-72 h-full flex flex-col bg-card border-r border-border">
       {/* Header */}
-      <div className="p-4 border-b border-sidebar-border">
+      <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl font-bold text-gradient">ChatFlow</h1>
           {pendingRequests.length > 0 && (
-            <span className="px-2 py-0.5 text-xs font-medium bg-primary text-primary-foreground rounded-full">
+            <span className="px-2 py-0.5 text-xs font-medium bg-primary text-primary-foreground rounded-full animate-pulse-soft">
               {pendingRequests.length}
             </span>
           )}
@@ -174,136 +171,147 @@ export function Sidebar({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search conversations..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl bg-sidebar-accent border border-sidebar-border text-sm placeholder:text-muted-foreground focus:outline-none focus:border-sidebar-primary transition-colors"
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-muted/50 border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
           />
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-2 space-y-2">
+      <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-4">
         {/* Pending Friend Requests */}
         {pendingRequests.length > 0 && (
-          <div className="p-2 mb-2 rounded-lg bg-primary/10 border border-primary/20">
-            <p className="text-xs font-semibold text-primary mb-2">Friend Requests</p>
-            {pendingRequests.map((request) => (
-              <div key={request.id} className="flex items-center justify-between gap-2 py-1">
-                <div className="flex items-center gap-2">
-                  <UserAvatar
-                    src={request.friend.avatar}
-                    username={request.friend.username}
-                    status={request.friend.status}
-                    size="sm"
-                  />
-                  <span className="text-sm truncate">{request.friend.username}</span>
+          <div className="p-3 rounded-xl bg-primary/10 border border-primary/30">
+            <p className="text-xs font-semibold text-primary mb-3 flex items-center gap-2">
+              <UserPlus className="w-3 h-3" />
+              Friend Requests
+            </p>
+            <div className="space-y-2">
+              {pendingRequests.map((request) => (
+                <div key={request.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-background/50">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <UserAvatar
+                      src={request.friend.avatar}
+                      username={request.friend.username}
+                      status={request.friend.status}
+                      size="sm"
+                    />
+                    <span className="text-sm font-medium truncate">{request.friend.username}</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => onAcceptFriendRequest?.(request.id)}
+                      className="p-1.5 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-400 transition-colors"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => onRejectFriendRequest?.(request.id)}
+                      className="p-1.5 rounded-lg bg-destructive/20 hover:bg-destructive/30 text-destructive transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => onAcceptFriendRequest?.(request.id)}
-                    className="p-1 rounded-md bg-green-500/20 hover:bg-green-500/30 text-green-500"
-                  >
-                    <Check className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={() => onRejectFriendRequest?.(request.id)}
-                    className="p-1 rounded-md bg-destructive/20 hover:bg-destructive/30 text-destructive"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Rooms Section */}
+        {/* Channels Section */}
         <Collapsible open={roomsOpen} onOpenChange={setRoomsOpen}>
-          <div className="flex items-center justify-between px-2 py-1">
-            <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
-              <ChevronDown
-                className={cn(
-                  'w-3 h-3 transition-transform',
-                  !roomsOpen && '-rotate-90'
-                )}
-              />
+          <div className="flex items-center justify-between mb-2">
+            <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
+              <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', !roomsOpen && '-rotate-90')} />
               Channels
             </CollapsibleTrigger>
-            <Dialog open={createRoomOpen} onOpenChange={setCreateRoomOpen}>
-              <DialogTrigger asChild>
-                <button className="p-1 rounded-md hover:bg-sidebar-accent transition-colors" title="Create channel">
-                  <Plus className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create a new channel</DialogTitle>
-                  <DialogDescription>
-                    Create a channel to start chatting with others
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="room-name">Channel Name</Label>
-                    <Input
-                      id="room-name"
-                      placeholder="general"
-                      value={newRoomName}
-                      onChange={(e) => setNewRoomName(e.target.value)}
-                    />
+            <div className="flex gap-1">
+              <Dialog open={joinRoomOpen} onOpenChange={setJoinRoomOpen}>
+                <DialogTrigger asChild>
+                  <button className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Join with code">
+                    <Link className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Join a channel</DialogTitle>
+                    <DialogDescription>
+                      Enter an invite code to join a channel
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="invite-code">Invite Code</Label>
+                      <Input
+                        id="invite-code"
+                        placeholder="ABC12345"
+                        value={inviteCode}
+                        onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                        className="uppercase tracking-wider font-mono"
+                      />
+                    </div>
+                    <Button onClick={handleJoinByCode} className="w-full">
+                      Join Channel
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="room-description">Description (optional)</Label>
-                    <Input
-                      id="room-description"
-                      placeholder="A place for general discussion"
-                      value={newRoomDescription}
-                      onChange={(e) => setNewRoomDescription(e.target.value)}
-                    />
+                </DialogContent>
+              </Dialog>
+              <Dialog open={createRoomOpen} onOpenChange={setCreateRoomOpen}>
+                <DialogTrigger asChild>
+                  <button className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Create channel">
+                    <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create a new channel</DialogTitle>
+                    <DialogDescription>
+                      Create a channel and share the invite code with friends
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="room-name">Channel Name</Label>
+                      <Input
+                        id="room-name"
+                        placeholder="general"
+                        value={newRoomName}
+                        onChange={(e) => setNewRoomName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="room-description">Description (optional)</Label>
+                      <Input
+                        id="room-description"
+                        placeholder="A place for general discussion"
+                        value={newRoomDescription}
+                        onChange={(e) => setNewRoomDescription(e.target.value)}
+                      />
+                    </div>
+                    <Button onClick={handleCreateRoom} className="w-full">
+                      Create Channel
+                    </Button>
                   </div>
-                  <Button onClick={handleCreateRoom} className="w-full">
-                    Create Channel
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-            <Dialog open={joinRoomOpen} onOpenChange={setJoinRoomOpen}>
-              <DialogTrigger asChild>
-                <button className="p-1 rounded-md hover:bg-sidebar-accent transition-colors" title="Join with code">
-                  <Link className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Join a channel</DialogTitle>
-                  <DialogDescription>
-                    Enter an invite code to join a channel
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="invite-code">Invite Code</Label>
-                    <Input
-                      id="invite-code"
-                      placeholder="ABC12345"
-                      value={inviteCode}
-                      onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                      className="uppercase tracking-wider font-mono"
-                    />
-                  </div>
-                  <Button onClick={handleJoinByCode} className="w-full">
-                    Join Channel
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
           <CollapsibleContent className="space-y-1">
             {filteredRooms.length === 0 ? (
-              <p className="px-2 py-4 text-xs text-muted-foreground text-center">
-                No channels yet. Create one!
-              </p>
+              <div className="px-3 py-6 text-center">
+                <Hash className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                <p className="text-xs text-muted-foreground">
+                  No channels yet
+                </p>
+                <button 
+                  onClick={() => setCreateRoomOpen(true)}
+                  className="text-xs text-primary hover:underline mt-1"
+                >
+                  Create one
+                </button>
+              </div>
             ) : (
               filteredRooms.map((room) => (
                 <div key={room.id} className="group relative">
@@ -318,8 +326,8 @@ export function Sidebar({
                         e.stopPropagation();
                         copyInviteCode(room.inviteCode!);
                       }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-sidebar-accent/80 hover:bg-sidebar-accent opacity-0 group-hover:opacity-100 transition-opacity"
-                      title={`Copy invite code: ${room.inviteCode}`}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-muted hover:bg-muted/80 opacity-0 group-hover:opacity-100 transition-all"
+                      title={`Copy: ${room.inviteCode}`}
                     >
                       <Copy className="w-3 h-3 text-muted-foreground" />
                     </button>
@@ -332,22 +340,23 @@ export function Sidebar({
 
         {/* Direct Messages Section */}
         <Collapsible open={dmsOpen} onOpenChange={setDmsOpen}>
-          <div className="flex items-center justify-between px-2 py-1 mt-4">
-            <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
-              <ChevronDown
-                className={cn(
-                  'w-3 h-3 transition-transform',
-                  !dmsOpen && '-rotate-90'
-                )}
-              />
+          <div className="flex items-center justify-between mb-2">
+            <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
+              <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', !dmsOpen && '-rotate-90')} />
               Direct Messages
             </CollapsibleTrigger>
           </div>
           <CollapsibleContent className="space-y-1">
             {filteredDMs.length === 0 ? (
-              <p className="px-2 py-4 text-xs text-muted-foreground text-center">
-                No conversations yet
-              </p>
+              <div className="px-3 py-6 text-center">
+                <MessageSquare className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                <p className="text-xs text-muted-foreground">
+                  No conversations yet
+                </p>
+                <p className="text-xs text-muted-foreground/70 mt-1">
+                  Click a friend to start chatting
+                </p>
+              </div>
             ) : (
               filteredDMs.map((dm) => (
                 <RoomListItem
@@ -363,20 +372,15 @@ export function Sidebar({
 
         {/* Friends Section */}
         <Collapsible open={friendsOpen} onOpenChange={setFriendsOpen}>
-          <div className="flex items-center justify-between px-2 py-1 mt-4">
-            <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
-              <ChevronDown
-                className={cn(
-                  'w-3 h-3 transition-transform',
-                  !friendsOpen && '-rotate-90'
-                )}
-              />
+          <div className="flex items-center justify-between mb-2">
+            <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
+              <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', !friendsOpen && '-rotate-90')} />
               Friends ({friends.length})
             </CollapsibleTrigger>
             <Dialog open={addFriendOpen} onOpenChange={setAddFriendOpen}>
               <DialogTrigger asChild>
-                <button className="p-1 rounded-md hover:bg-sidebar-accent transition-colors">
-                  <UserPlus className="w-4 h-4 text-muted-foreground" />
+                <button className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Add friend">
+                  <UserPlus className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
               </DialogTrigger>
               <DialogContent>
@@ -391,7 +395,7 @@ export function Sidebar({
                     <Label htmlFor="friend-username">Username</Label>
                     <Input
                       id="friend-username"
-                      placeholder="username"
+                      placeholder="Enter username..."
                       value={friendUsername}
                       onChange={(e) => setFriendUsername(e.target.value)}
                     />
@@ -405,15 +409,24 @@ export function Sidebar({
           </div>
           <CollapsibleContent className="space-y-1">
             {friends.length === 0 ? (
-              <p className="px-2 py-4 text-xs text-muted-foreground text-center">
-                No friends yet. Add some!
-              </p>
+              <div className="px-3 py-6 text-center">
+                <UserPlus className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                <p className="text-xs text-muted-foreground">
+                  No friends yet
+                </p>
+                <button 
+                  onClick={() => setAddFriendOpen(true)}
+                  className="text-xs text-primary hover:underline mt-1"
+                >
+                  Add some
+                </button>
+              </div>
             ) : (
               friends.map((friend) => (
                 <button
                   key={friend.id}
                   onClick={() => onStartDM?.(friend.id)}
-                  className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-sidebar-accent transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
                 >
                   <UserAvatar
                     src={friend.avatar}
@@ -421,8 +434,8 @@ export function Sidebar({
                     status={friend.status}
                     size="sm"
                   />
-                  <span className="text-sm truncate flex-1 text-left">{friend.username}</span>
-                  <MessageSquare className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                  <span className="text-sm font-medium truncate flex-1 text-left">{friend.username}</span>
+                  <MessageSquare className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
               ))
             )}
@@ -431,10 +444,10 @@ export function Sidebar({
       </div>
 
       {/* User Section */}
-      <div className="p-3 border-t border-sidebar-border">
+      <div className="p-3 border-t border-border">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-sidebar-accent transition-colors">
+            <button className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted transition-colors">
               <UserAvatar
                 src={currentUser.avatar}
                 username={currentUser.username}
@@ -445,19 +458,9 @@ export function Sidebar({
                 <p className="font-medium text-sm truncate">{currentUser.username}</p>
                 <p className="text-xs text-muted-foreground capitalize">{currentUser.status}</p>
               </div>
-              <Settings className="w-4 h-4 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem>
-              <Users className="w-4 h-4 mr-2" />
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onSignOut} className="text-destructive focus:text-destructive">
               <LogOut className="w-4 h-4 mr-2" />
               Logout
