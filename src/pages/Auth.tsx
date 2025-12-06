@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MessageCircle, Loader2, Sparkles, Users, Zap } from 'lucide-react';
+import { MessageCircle, Loader2, Sparkles, Users, Zap, Shield, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -103,94 +103,121 @@ const Auth = () => {
   };
 
   const features = [
-    { icon: Zap, label: 'Real-time messaging', desc: 'Instant delivery' },
-    { icon: Users, label: 'Group channels', desc: 'Collaborate together' },
-    { icon: Sparkles, label: 'Reactions & files', desc: 'Express yourself' },
+    { icon: Zap, label: 'Lightning Fast', desc: 'Real-time messaging with instant delivery', color: 'from-primary to-cyan-400' },
+    { icon: Users, label: 'Team Channels', desc: 'Create rooms & invite your squad', color: 'from-accent to-pink-400' },
+    { icon: Shield, label: 'Secure', desc: 'End-to-end encrypted conversations', color: 'from-green-400 to-emerald-500' },
   ];
 
   return (
-    <div className="min-h-screen bg-background flex overflow-hidden">
+    <div className="min-h-screen bg-background flex overflow-hidden relative">
+      {/* Animated background */}
+      <div className="absolute inset-0 bg-gradient-mesh opacity-60" />
+      <div className="absolute inset-0 pattern-grid opacity-30" />
+      
+      {/* Floating orbs */}
+      <div className="absolute top-20 left-[10%] w-72 h-72 bg-primary/20 rounded-full blur-[100px] animate-float" />
+      <div className="absolute bottom-20 right-[15%] w-96 h-96 bg-accent/15 rounded-full blur-[120px] animate-float" style={{ animationDelay: '-4s' }} />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[150px]" />
+      
       {/* Left side - Branding */}
-      <div className="hidden lg:flex lg:flex-1 flex-col justify-center items-center p-12 relative">
-        {/* Background effects */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '-3s' }} />
-        
-        <div className="relative z-10 max-w-md text-center space-y-8">
+      <div className="hidden lg:flex lg:flex-1 flex-col justify-center items-center p-12 relative z-10">
+        <div className="max-w-lg text-center space-y-10">
           {/* Logo */}
-          <div className="inline-flex items-center justify-center">
-            <div className="relative">
-              <div className="w-24 h-24 rounded-3xl bg-gradient-primary flex items-center justify-center animate-glow-pulse">
-                <MessageCircle className="w-12 h-12 text-primary-foreground" />
+          <div className="inline-flex items-center justify-center animate-fade-in">
+            <div className="relative group">
+              <div className="absolute -inset-4 bg-gradient-primary rounded-[2rem] opacity-20 blur-xl group-hover:opacity-40 transition-opacity duration-500" />
+              <div className="relative w-28 h-28 rounded-3xl bg-gradient-primary flex items-center justify-center glow-neon">
+                <MessageCircle className="w-14 h-14 text-primary-foreground" />
               </div>
-              <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-accent flex items-center justify-center">
-                <Sparkles className="w-3 h-3 text-accent-foreground" />
+              <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-gradient-accent flex items-center justify-center animate-bounce-in" style={{ animationDelay: '0.3s' }}>
+                <Sparkles className="w-4 h-4 text-accent-foreground" />
               </div>
             </div>
           </div>
 
-          <div>
-            <h1 className="text-5xl font-bold text-gradient mb-3">ChatFlow</h1>
+          <div className="space-y-4 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <h1 className="text-6xl font-bold">
+              <span className="text-gradient">ChatFlow</span>
+            </h1>
             <p className="text-xl text-muted-foreground">
-              Connect with friends in real-time
+              Where conversations come alive
             </p>
           </div>
 
           {/* Features */}
-          <div className="space-y-4 pt-8">
+          <div className="space-y-4 pt-6">
             {features.map((feature, i) => (
               <div 
                 key={feature.label} 
-                className="flex items-center gap-4 p-4 rounded-2xl glass hover-lift animate-fade-in-up"
-                style={{ animationDelay: `${i * 0.1}s` }}
+                className="flex items-center gap-5 p-5 rounded-2xl glass hover-lift cursor-default animate-fade-in-up"
+                style={{ animationDelay: `${0.2 + i * 0.1}s` }}
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center">
-                  <feature.icon className="w-6 h-6 text-primary-foreground" />
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feature.color} flex items-center justify-center shadow-lg`}>
+                  <feature.icon className="w-7 h-7 text-white" />
                 </div>
                 <div className="text-left">
-                  <p className="font-semibold text-foreground">{feature.label}</p>
+                  <p className="font-semibold text-lg text-foreground">{feature.label}</p>
                   <p className="text-sm text-muted-foreground">{feature.desc}</p>
                 </div>
               </div>
             ))}
           </div>
+
+          {/* Stats */}
+          <div className="flex items-center justify-center gap-8 pt-4 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+            <div className="text-center">
+              <p className="text-3xl font-bold text-gradient">10K+</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Users</p>
+            </div>
+            <div className="w-px h-10 bg-border" />
+            <div className="text-center">
+              <p className="text-3xl font-bold text-gradient">1M+</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Messages</p>
+            </div>
+            <div className="w-px h-10 bg-border" />
+            <div className="text-center flex items-center gap-2">
+              <Globe className="w-5 h-5 text-primary" />
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Global</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Right side - Auth Form */}
-      <div className="flex-1 flex flex-col justify-center items-center p-6 lg:p-12">
+      <div className="flex-1 flex flex-col justify-center items-center p-6 lg:p-12 relative z-10">
         <div className="w-full max-w-md space-y-8">
           {/* Mobile Logo */}
-          <div className="lg:hidden text-center space-y-4">
+          <div className="lg:hidden text-center space-y-4 animate-fade-in">
             <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center glow">
-                <MessageCircle className="w-8 h-8 text-primary-foreground" />
+              <div className="relative">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-primary flex items-center justify-center glow">
+                  <MessageCircle className="w-10 h-10 text-primary-foreground" />
+                </div>
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-gradient">ChatFlow</h1>
+            <h1 className="text-4xl font-bold text-gradient">ChatFlow</h1>
           </div>
 
           {/* Auth Card */}
-          <div className="glass-strong rounded-3xl p-8 animate-fade-in">
+          <div className="glass-strong rounded-3xl p-8 animate-scale-in neon-border">
             {/* Tab Switcher */}
-            <div className="flex gap-2 p-1.5 rounded-2xl bg-muted/50 mb-8">
+            <div className="flex gap-2 p-1.5 rounded-2xl bg-muted/30 mb-8">
               <button
                 onClick={() => setActiveTab('signin')}
-                className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all ${
+                className={`flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-300 ${
                   activeTab === 'signin'
-                    ? 'bg-gradient-primary text-primary-foreground glow'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-gradient-primary text-primary-foreground shadow-glow'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 }`}
               >
                 Sign In
               </button>
               <button
                 onClick={() => setActiveTab('signup')}
-                className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all ${
+                className={`flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-300 ${
                   activeTab === 'signup'
-                    ? 'bg-gradient-primary text-primary-foreground glow'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-gradient-primary text-primary-foreground shadow-glow'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 }`}
               >
                 Sign Up
@@ -201,7 +228,7 @@ const Auth = () => {
             {activeTab === 'signin' && (
               <form onSubmit={handleSignIn} className="space-y-6 animate-fade-in">
                 <div className="space-y-2">
-                  <Label htmlFor="signin-email" className="text-sm font-medium">Email</Label>
+                  <Label htmlFor="signin-email" className="text-sm font-medium text-foreground">Email</Label>
                   <Input
                     id="signin-email"
                     type="email"
@@ -210,11 +237,11 @@ const Auth = () => {
                     onChange={(e) => setSignInEmail(e.target.value)}
                     required
                     disabled={isLoading}
-                    className="h-12 rounded-xl bg-muted/50 border-border/50 focus:border-primary/50"
+                    className="h-12 rounded-xl bg-muted/30 border-border/50 focus:border-primary focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password" className="text-sm font-medium">Password</Label>
+                  <Label htmlFor="signin-password" className="text-sm font-medium text-foreground">Password</Label>
                   <Input
                     id="signin-password"
                     type="password"
@@ -223,12 +250,14 @@ const Auth = () => {
                     onChange={(e) => setSignInPassword(e.target.value)}
                     required
                     disabled={isLoading}
-                    className="h-12 rounded-xl bg-muted/50 border-border/50 focus:border-primary/50"
+                    className="h-12 rounded-xl bg-muted/30 border-border/50 focus:border-primary focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
                   />
                 </div>
                 <Button 
                   type="submit" 
-                  className="w-full h-12 rounded-xl bg-gradient-primary hover:opacity-90 glow-hover text-base font-semibold" 
+                  variant="glow"
+                  size="lg"
+                  className="w-full"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -247,7 +276,7 @@ const Auth = () => {
             {activeTab === 'signup' && (
               <form onSubmit={handleSignUp} className="space-y-5 animate-fade-in">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-username" className="text-sm font-medium">Username</Label>
+                  <Label htmlFor="signup-username" className="text-sm font-medium text-foreground">Username</Label>
                   <Input
                     id="signup-username"
                     type="text"
@@ -256,11 +285,11 @@ const Auth = () => {
                     onChange={(e) => setSignUpUsername(e.target.value)}
                     required
                     disabled={isLoading}
-                    className="h-12 rounded-xl bg-muted/50 border-border/50 focus:border-primary/50"
+                    className="h-12 rounded-xl bg-muted/30 border-border/50 focus:border-primary focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email" className="text-sm font-medium">Email</Label>
+                  <Label htmlFor="signup-email" className="text-sm font-medium text-foreground">Email</Label>
                   <Input
                     id="signup-email"
                     type="email"
@@ -269,12 +298,12 @@ const Auth = () => {
                     onChange={(e) => setSignUpEmail(e.target.value)}
                     required
                     disabled={isLoading}
-                    className="h-12 rounded-xl bg-muted/50 border-border/50 focus:border-primary/50"
+                    className="h-12 rounded-xl bg-muted/30 border-border/50 focus:border-primary focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-sm font-medium">Password</Label>
+                    <Label htmlFor="signup-password" className="text-sm font-medium text-foreground">Password</Label>
                     <Input
                       id="signup-password"
                       type="password"
@@ -283,11 +312,11 @@ const Auth = () => {
                       onChange={(e) => setSignUpPassword(e.target.value)}
                       required
                       disabled={isLoading}
-                      className="h-12 rounded-xl bg-muted/50 border-border/50 focus:border-primary/50"
+                      className="h-12 rounded-xl bg-muted/30 border-border/50 focus:border-primary focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-confirm" className="text-sm font-medium">Confirm</Label>
+                    <Label htmlFor="signup-confirm" className="text-sm font-medium text-foreground">Confirm</Label>
                     <Input
                       id="signup-confirm"
                       type="password"
@@ -296,13 +325,15 @@ const Auth = () => {
                       onChange={(e) => setSignUpConfirmPassword(e.target.value)}
                       required
                       disabled={isLoading}
-                      className="h-12 rounded-xl bg-muted/50 border-border/50 focus:border-primary/50"
+                      className="h-12 rounded-xl bg-muted/30 border-border/50 focus:border-primary focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
                     />
                   </div>
                 </div>
                 <Button 
                   type="submit" 
-                  className="w-full h-12 rounded-xl bg-gradient-primary hover:opacity-90 glow-hover text-base font-semibold" 
+                  variant="glow"
+                  size="lg"
+                  className="w-full"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -318,7 +349,7 @@ const Auth = () => {
             )}
           </div>
 
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-muted-foreground animate-fade-in" style={{ animationDelay: '0.4s' }}>
             By continuing, you agree to our terms of service and privacy policy.
           </p>
         </div>
