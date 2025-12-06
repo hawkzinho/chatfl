@@ -200,6 +200,43 @@ export const useRooms = () => {
     toast.success('Room deleted');
   };
 
+  const updateRoom = async (roomId: string, name: string, description: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('chat_rooms')
+      .update({ name, description })
+      .eq('id', roomId)
+      .eq('created_by', user.id);
+
+    if (error) {
+      toast.error('Failed to update room');
+      console.error(error);
+      return;
+    }
+
+    await fetchRooms();
+  };
+
+  const regenerateInviteCode = async (roomId: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('chat_rooms')
+      .update({ invite_code: crypto.randomUUID().substring(0, 8).toUpperCase() })
+      .eq('id', roomId)
+      .eq('created_by', user.id);
+
+    if (error) {
+      toast.error('Failed to regenerate invite code');
+      console.error(error);
+      return;
+    }
+
+    await fetchRooms();
+    toast.success('Invite code regenerated!');
+  };
+
   const joinByCode = async (inviteCode: string) => {
     if (!user) return null;
 
@@ -256,6 +293,8 @@ export const useRooms = () => {
     joinRoom,
     leaveRoom,
     deleteRoom,
+    updateRoom,
+    regenerateInviteCode,
     refreshRooms: fetchRooms,
   };
 };

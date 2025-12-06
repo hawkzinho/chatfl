@@ -89,11 +89,11 @@ export const useMessages = (roomId: string | null) => {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Subscribe to realtime messages
+  // Subscribe to realtime messages and reactions
   useEffect(() => {
     if (!roomId) return;
 
-    const channel = supabase
+    const messagesChannel = supabase
       .channel(`messages:${roomId}`)
       .on(
         'postgres_changes',
@@ -136,10 +136,59 @@ export const useMessages = (roomId: string | null) => {
       )
       .subscribe();
 
+    // Subscribe to reactions for real-time updates
+    const reactionsChannel = supabase
+      .channel(`reactions:${roomId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'message_reactions',
+        },
+        async (payload) => {
+          // Refetch reactions when any change happens
+          const newPayload = payload.new as { message_id?: string } | undefined;
+          const oldPayload = payload.old as { message_id?: string } | undefined;
+          const messageId = newPayload?.message_id || oldPayload?.message_id;
+          if (!messageId) return;
+
+          // Check if this message belongs to current room
+          const message = messages.find(m => m.id === messageId);
+          if (!message) return;
+
+          // Fetch updated reactions for this message
+          const { data: reactions } = await supabase
+            .from('message_reactions')
+            .select('message_id, emoji, user_id')
+            .eq('message_id', messageId);
+
+          if (reactions) {
+            const reactionsByEmoji: Record<string, string[]> = {};
+            reactions.forEach(r => {
+              if (!reactionsByEmoji[r.emoji]) {
+                reactionsByEmoji[r.emoji] = [];
+              }
+              reactionsByEmoji[r.emoji].push(r.user_id);
+            });
+
+            const formattedReactions = Object.entries(reactionsByEmoji).map(([emoji, users]) => ({ emoji, users }));
+
+            setMessages(prev => prev.map(m => 
+              m.id === messageId 
+                ? { ...m, reactions: formattedReactions }
+                : m
+            ));
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(reactionsChannel);
     };
-  }, [roomId]);
+  }, [roomId, messages]);
 
   const uploadFile = async (file: File): Promise<{ url: string; name: string; type: string } | null> => {
     if (!user) return null;
@@ -244,8 +293,7 @@ export const useMessages = (roomId: string | null) => {
       toast.error('Failed to add reaction');
       console.error(error);
     }
-    
-    await fetchMessages();
+    // Real-time will handle the update
   };
 
   const removeReaction = async (messageId: string, emoji: string) => {
@@ -262,8 +310,7 @@ export const useMessages = (roomId: string | null) => {
       toast.error('Failed to remove reaction');
       console.error(error);
     }
-    
-    await fetchMessages();
+    // Real-time will handle the update
   };
 
   return {

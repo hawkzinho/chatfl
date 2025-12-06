@@ -41,6 +41,7 @@ interface ChatRoom {
   type: 'public' | 'private' | 'direct';
   avatar?: string;
   inviteCode?: string;
+  createdBy?: string;
   members: User[];
   createdAt: Date;
 }
@@ -55,23 +56,34 @@ interface ChatViewProps {
   onReact?: (messageId: string, emoji: string) => void;
   onEditMessage?: (messageId: string, content: string) => void;
   onDeleteMessage?: (messageId: string) => void;
+  onTyping?: () => void;
   replyingTo?: Message;
   onCancelReply?: () => void;
   isLoading?: boolean;
+  onDeleteRoom?: (roomId: string) => Promise<void>;
+  onLeaveRoom?: (roomId: string) => Promise<void>;
+  onUpdateRoom?: (roomId: string, name: string, description: string) => Promise<void>;
+  onRegenerateCode?: (roomId: string) => Promise<void>;
 }
 
 export function ChatView({
   room,
   messages,
   currentUserId,
+  typingUsers = [],
   onSendMessage,
   onReply,
   onReact,
   onEditMessage,
   onDeleteMessage,
+  onTyping,
   replyingTo,
   onCancelReply,
   isLoading,
+  onDeleteRoom,
+  onLeaveRoom,
+  onUpdateRoom,
+  onRegenerateCode,
 }: ChatViewProps) {
   const handleSend = useCallback(
     (content: string, attachments?: File[]) => {
@@ -137,12 +149,22 @@ export function ChatView({
     );
   }
 
+  const isOwner = room.createdBy === currentUserId;
+
   return (
     <div className="flex-1 flex flex-col bg-background h-full relative">
       {/* Subtle background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-primary/2 to-transparent pointer-events-none" />
       
-      <ChatHeader room={room} currentUserId={currentUserId} />
+      <ChatHeader 
+        room={room} 
+        currentUserId={currentUserId}
+        isOwner={isOwner}
+        onDeleteRoom={onDeleteRoom}
+        onLeaveRoom={onLeaveRoom}
+        onUpdateRoom={onUpdateRoom}
+        onRegenerateCode={onRegenerateCode}
+      />
       
       <div className="flex-1 overflow-hidden relative">
         {isLoading ? (
@@ -177,7 +199,7 @@ export function ChatView({
           <MessageList
             messages={messages as any}
             currentUserId={currentUserId}
-            typingUsers={[]}
+            typingUsers={typingUsers}
             onReply={onReply as any}
             onEdit={onEditMessage ? (msg: any) => {
               const newContent = prompt('Edit message:', msg.content);
@@ -197,6 +219,7 @@ export function ChatView({
       
       <MessageInput
         onSend={handleSend}
+        onTyping={onTyping}
         replyTo={replyingTo as any}
         onCancelReply={onCancelReply}
         placeholder={`Message ${room.type === 'direct' ? room.name : '#' + room.name}...`}

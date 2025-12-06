@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRooms } from '@/hooks/useRooms';
 import { useMessages, Message } from '@/hooks/useMessages';
 import { useFriendships } from '@/hooks/useFriendships';
+import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { Sidebar } from '@/components/chat/Sidebar';
 import { ChatView } from '@/components/chat/ChatView';
 import { Loader2 } from 'lucide-react';
@@ -11,13 +12,14 @@ import { Loader2 } from 'lucide-react';
 const Index = () => {
   const navigate = useNavigate();
   const { user, profile, loading: authLoading, signOut } = useAuth();
-  const { rooms, createRoom, refreshRooms, joinByCode } = useRooms();
-  const { friends, pendingRequests, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, startDirectMessage } = useFriendships();
+  const { rooms, createRoom, refreshRooms, joinByCode, deleteRoom, updateRoom, regenerateInviteCode, leaveRoom } = useRooms();
+  const { friends, pendingRequests, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, removeFriend, startDirectMessage } = useFriendships();
   
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   
   const { messages, loading: messagesLoading, sendMessage, editMessage, deleteMessage, addReaction, removeReaction } = useMessages(activeRoomId);
+  const { typingUsers, startTyping, stopTyping } = useTypingIndicator(activeRoomId);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -41,6 +43,7 @@ const Index = () => {
   };
 
   const handleSendMessage = async (content: string, files?: File[]) => {
+    stopTyping();
     await sendMessage(content, replyingTo?.id, files);
     setReplyingTo(null);
   };
@@ -82,6 +85,20 @@ const Index = () => {
     }
   };
 
+  const handleDeleteRoom = async (roomId: string) => {
+    await deleteRoom(roomId);
+    if (activeRoomId === roomId) {
+      setActiveRoomId(rooms.length > 1 ? rooms.find(r => r.id !== roomId)?.id || null : null);
+    }
+  };
+
+  const handleLeaveRoom = async (roomId: string) => {
+    await leaveRoom(roomId);
+    if (activeRoomId === roomId) {
+      setActiveRoomId(rooms.length > 1 ? rooms.find(r => r.id !== roomId)?.id || null : null);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
@@ -109,6 +126,7 @@ const Index = () => {
     type: r.type as 'public' | 'private' | 'direct',
     avatar: r.avatar_url || undefined,
     inviteCode: r.invite_code || undefined,
+    createdBy: r.created_by || undefined,
     members: r.members?.map(m => ({
       id: m.id,
       username: m.username,
@@ -204,6 +222,7 @@ const Index = () => {
     type: activeRoom.type as 'public' | 'private' | 'direct',
     avatar: activeRoom.avatar_url || undefined,
     inviteCode: activeRoom.invite_code || undefined,
+    createdBy: activeRoom.created_by || undefined,
     members: activeRoom.members?.map(m => ({
       id: m.id,
       username: m.username,
@@ -216,10 +235,14 @@ const Index = () => {
   // Transform friends for sidebar
   const friendsList = friends.map(f => ({
     id: f.friend.id,
+    friendshipId: f.id,
     username: f.friend.username,
     avatar: f.friend.avatar_url || undefined,
     status: f.friend.status as 'online' | 'offline' | 'away' | 'busy',
   }));
+
+  // Typing users for display
+  const typingUsernames = typingUsers.map(u => u.username);
 
   return (
     <div className="h-screen bg-background flex overflow-hidden">
@@ -244,20 +267,26 @@ const Index = () => {
         onSendFriendRequest={sendFriendRequest}
         onAcceptFriendRequest={acceptFriendRequest}
         onRejectFriendRequest={rejectFriendRequest}
+        onRemoveFriend={removeFriend}
         onStartDM={handleStartDM}
         onJoinByCode={handleJoinByCode}
+        onDeleteRoom={handleDeleteRoom}
+        onLeaveRoom={handleLeaveRoom}
+        onUpdateRoom={updateRoom}
+        onRegenerateCode={regenerateInviteCode}
       />
       
       <ChatView
         room={activeChatRoom}
         messages={chatMessages}
         currentUserId={user.id}
-        typingUsers={[]}
+        typingUsers={typingUsernames}
         onSendMessage={handleSendMessage}
         onReply={handleReply}
         onReact={handleReact}
         onEditMessage={editMessage}
         onDeleteMessage={deleteMessage}
+        onTyping={startTyping}
         replyingTo={replyingTo ? {
           id: replyingTo.id,
           content: replyingTo.content,
@@ -273,6 +302,10 @@ const Index = () => {
         } : undefined}
         onCancelReply={() => setReplyingTo(null)}
         isLoading={messagesLoading}
+        onDeleteRoom={handleDeleteRoom}
+        onLeaveRoom={handleLeaveRoom}
+        onUpdateRoom={updateRoom}
+        onRegenerateCode={regenerateInviteCode}
       />
     </div>
   );
