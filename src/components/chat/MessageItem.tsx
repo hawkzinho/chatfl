@@ -10,7 +10,8 @@ import {
   Pencil, 
   Trash2,
   FileText,
-  Download
+  Download,
+  ExternalLink
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -48,13 +49,24 @@ const formatTime = (date: Date): string => {
 const AttachmentPreview = ({ attachment }: { attachment: any }) => {
   if (attachment.type === 'image') {
     return (
-      <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="mt-2 rounded-xl overflow-hidden max-w-xs block">
+      <a 
+        href={attachment.url} 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        className="mt-3 rounded-2xl overflow-hidden max-w-sm block group relative"
+      >
         <img
           src={attachment.url}
           alt={attachment.name}
-          className="w-full h-auto object-cover hover:opacity-90 transition-opacity cursor-pointer"
+          className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
           loading="lazy"
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-3">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-foreground bg-background/80 backdrop-blur-sm px-2.5 py-1.5 rounded-lg">
+            <ExternalLink className="w-3.5 h-3.5" />
+            Open
+          </span>
+        </div>
       </a>
     );
   }
@@ -65,16 +77,16 @@ const AttachmentPreview = ({ attachment }: { attachment: any }) => {
       target="_blank" 
       rel="noopener noreferrer"
       download={attachment.name}
-      className="mt-2 flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border max-w-xs hover:bg-muted transition-colors"
+      className="mt-3 flex items-center gap-4 p-4 rounded-2xl bg-muted/30 border border-border/50 max-w-sm hover:bg-muted/50 hover:border-primary/30 transition-all group"
     >
-      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-        <FileText className="w-5 h-5 text-primary" />
+      <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center shrink-0">
+        <FileText className="w-6 h-6 text-primary-foreground" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{attachment.name}</p>
+        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{attachment.name}</p>
         <p className="text-xs text-muted-foreground">Click to download</p>
       </div>
-      <Download className="w-4 h-4 text-muted-foreground" />
+      <Download className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
     </a>
   );
 };
@@ -98,48 +110,58 @@ export function MessageItem({
   return (
     <div
       className={cn(
-        'group flex gap-3 px-4 py-2 hover:bg-muted/30 transition-colors animate-fade-in',
+        'group flex gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 animate-message-pop',
+        'hover:bg-muted/20',
         isOwn && 'flex-row-reverse'
       )}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
       {showAvatar ? (
-        <UserAvatar
-          src={message.sender.avatar}
-          username={message.sender.username}
-          status={message.sender.status}
-          size="md"
-        />
+        <div className="shrink-0">
+          <UserAvatar
+            src={message.sender.avatar}
+            username={message.sender.username}
+            status={message.sender.status}
+            size="md"
+          />
+        </div>
       ) : (
         <div className="w-10" />
       )}
 
-      <div className={cn('flex-1 max-w-2xl', isOwn && 'flex flex-col items-end')}>
+      <div className={cn('flex-1 max-w-2xl min-w-0', isOwn && 'flex flex-col items-end')}>
         {showAvatar && (
-          <div className={cn('flex items-center gap-2 mb-1', isOwn && 'flex-row-reverse')}>
-            <span className="font-semibold text-sm">{message.sender.username}</span>
-            <span className="text-xs text-muted-foreground">
+          <div className={cn('flex items-center gap-2 mb-1.5', isOwn && 'flex-row-reverse')}>
+            <span className="font-semibold text-sm hover:text-primary transition-colors cursor-pointer">
+              {message.sender.username}
+            </span>
+            <span className="text-xs text-muted-foreground/70">
               {formatTime(message.createdAt)}
             </span>
             {message.isEdited && (
-              <span className="text-xs text-muted-foreground/70">(edited)</span>
+              <span className="text-xs text-muted-foreground/50 italic">(edited)</span>
             )}
           </div>
         )}
 
         <div
           className={cn(
-            'relative rounded-2xl px-4 py-2.5',
+            'relative rounded-2xl px-4 py-3 transition-all duration-200',
             isOwn
-              ? 'bg-primary text-primary-foreground rounded-br-md'
-              : 'bg-muted rounded-bl-md'
+              ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-br-md shadow-lg shadow-primary/20'
+              : 'bg-muted/50 rounded-bl-md border border-border/30'
           )}
         >
           {message.replyTo && (
-            <div className="mb-2 pl-3 border-l-2 border-primary/50 text-sm opacity-70">
-              <span className="font-medium">{message.replyTo.sender.username}</span>
-              <p className="truncate">{message.replyTo.content}</p>
+            <div className={cn(
+              "mb-3 pl-3 border-l-2 text-sm py-1 rounded-r-lg",
+              isOwn 
+                ? "border-primary-foreground/40 bg-primary-foreground/10" 
+                : "border-primary/50 bg-primary/5"
+            )}>
+              <span className="font-medium text-xs opacity-80">{message.replyTo.sender.username}</span>
+              <p className="truncate opacity-70 text-xs">{message.replyTo.content}</p>
             </div>
           )}
           
@@ -162,8 +184,8 @@ export function MessageItem({
       {/* Message Actions */}
       <div
         className={cn(
-          'flex items-center gap-0.5 opacity-0 transition-opacity',
-          showActions && 'opacity-100',
+          'flex items-center gap-1 transition-all duration-200',
+          showActions ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 pointer-events-none',
           isOwn ? 'order-first' : 'order-last'
         )}
       >
@@ -171,31 +193,31 @@ export function MessageItem({
           <TooltipTrigger asChild>
             <button
               onClick={() => onReply?.(message)}
-              className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+              className="p-2 rounded-xl hover:bg-muted/50 hover:text-primary transition-all hover:scale-110"
             >
               <Reply className="w-4 h-4 text-muted-foreground" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Reply</TooltipContent>
+          <TooltipContent side="top" className="text-xs">Reply</TooltipContent>
         </Tooltip>
 
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <button className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+                <button className="p-2 rounded-xl hover:bg-muted/50 hover:text-primary transition-all hover:scale-110">
                   <Smile className="w-4 h-4 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent>React</TooltipContent>
+            <TooltipContent side="top" className="text-xs">React</TooltipContent>
           </Tooltip>
-          <DropdownMenuContent align="center" className="flex gap-1 p-2">
+          <DropdownMenuContent align="center" className="flex gap-1.5 p-3 glass-strong rounded-2xl border-border/50">
             {quickEmojis.map((emoji) => (
               <button
                 key={emoji}
                 onClick={() => handleReact(emoji)}
-                className="p-1.5 hover:bg-muted rounded-lg transition-colors text-lg hover:scale-110"
+                className="p-2 hover:bg-muted/50 rounded-xl transition-all text-xl hover:scale-125 hover:-translate-y-1"
               >
                 {emoji}
               </button>
@@ -208,24 +230,24 @@ export function MessageItem({
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <button className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+                  <button className="p-2 rounded-xl hover:bg-muted/50 hover:text-primary transition-all hover:scale-110">
                     <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
-              <TooltipContent>More</TooltipContent>
+              <TooltipContent side="top" className="text-xs">More</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align={isOwn ? 'start' : 'end'}>
-              <DropdownMenuItem onClick={() => onEdit?.(message)}>
+            <DropdownMenuContent align={isOwn ? 'start' : 'end'} className="glass-strong rounded-xl border-border/50">
+              <DropdownMenuItem onClick={() => onEdit?.(message)} className="rounded-lg">
                 <Pencil className="w-4 h-4 mr-2" />
-                Edit
+                Edit Message
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => onDelete?.(message)}
-                className="text-destructive focus:text-destructive"
+                className="text-destructive focus:text-destructive focus:bg-destructive/10 rounded-lg"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                Delete
+                Delete Message
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
