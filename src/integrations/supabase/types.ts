@@ -269,6 +269,58 @@ export type Database = {
         }
         Relationships: []
       }
+      room_invites: {
+        Row: {
+          created_at: string
+          id: string
+          recipient_id: string
+          room_id: string
+          sender_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          recipient_id: string
+          room_id: string
+          sender_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          recipient_id?: string
+          room_id?: string
+          sender_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_invites_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_invites_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "chat_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_invites_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       room_members: {
         Row: {
           id: string

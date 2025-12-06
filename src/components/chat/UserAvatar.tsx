@@ -5,12 +5,13 @@ interface UserAvatarProps {
   src?: string;
   username: string;
   status?: UserStatus;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   showStatus?: boolean;
   className?: string;
 }
 
 const sizeClasses = {
+  xs: 'w-5 h-5 text-[10px]',
   sm: 'w-8 h-8 text-xs',
   md: 'w-10 h-10 text-sm',
   lg: 'w-12 h-12 text-base',
@@ -18,6 +19,7 @@ const sizeClasses = {
 };
 
 const statusSizeClasses = {
+  xs: 'w-2 h-2 -bottom-0 -right-0',
   sm: 'w-2.5 h-2.5 -bottom-0.5 -right-0.5',
   md: 'w-3 h-3 -bottom-0.5 -right-0.5',
   lg: 'w-3.5 h-3.5 bottom-0 right-0',

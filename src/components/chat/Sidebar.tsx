@@ -2,6 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { RoomListItem } from "./RoomListItem";
 import { UserAvatar } from "./UserAvatar";
+import { RoomInviteNotification } from "./RoomInviteNotification";
 import { 
   Search, 
   Plus, 
@@ -12,7 +13,6 @@ import {
   X,
   MessageSquare,
   Link,
-  Copy,
   Hash,
   Sparkles,
   Bell,
@@ -73,6 +73,23 @@ interface PendingRequest {
   friend: User;
 }
 
+interface RoomInvite {
+  id: string;
+  room_id: string;
+  sender: {
+    id: string;
+    username: string;
+    avatar_url: string | null;
+    status: string;
+  };
+  room: {
+    id: string;
+    name: string;
+    description: string | null;
+    type: string;
+  };
+}
+
 interface SidebarProps {
   currentUser: User;
   rooms: ChatRoom[];
@@ -83,6 +100,7 @@ interface SidebarProps {
   onSignOut?: () => void;
   friends?: Friend[];
   pendingRequests?: PendingRequest[];
+  roomInvites?: RoomInvite[];
   onSendFriendRequest?: (username: string) => void;
   onAcceptFriendRequest?: (requestId: string) => void;
   onRejectFriendRequest?: (requestId: string) => void;
@@ -93,6 +111,9 @@ interface SidebarProps {
   onLeaveRoom?: (roomId: string) => Promise<void>;
   onUpdateRoom?: (roomId: string, name: string, description: string) => Promise<void>;
   onRegenerateCode?: (roomId: string) => Promise<void>;
+  onAcceptRoomInvite?: (inviteId: string) => Promise<string | null>;
+  onRejectRoomInvite?: (inviteId: string) => Promise<void>;
+  onRoomInviteAccepted?: (roomId: string) => void;
 }
 
 export function Sidebar({
@@ -105,14 +126,17 @@ export function Sidebar({
   onSignOut,
   friends = [],
   pendingRequests = [],
+  roomInvites = [],
   onSendFriendRequest,
   onAcceptFriendRequest,
   onRejectFriendRequest,
   onRemoveFriend,
   onStartDM,
   onJoinByCode,
-  onDeleteRoom,
   onLeaveRoom,
+  onAcceptRoomInvite,
+  onRejectRoomInvite,
+  onRoomInviteAccepted,
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [roomsOpen, setRoomsOpen] = useState(true);
@@ -125,6 +149,8 @@ export function Sidebar({
   const [newRoomDescription, setNewRoomDescription] = useState('');
   const [friendUsername, setFriendUsername] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+
+  const totalNotifications = pendingRequests.length + roomInvites.length;
 
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -165,11 +191,6 @@ export function Sidebar({
     setJoinRoomOpen(false);
   };
 
-  const copyInviteCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    toast.success('Invite code copied!');
-  };
-
   const handleRemoveFriend = (friendshipId: string, username: string) => {
     if (confirm(`Remove ${username} from your friends?`)) {
       onRemoveFriend?.(friendshipId);
@@ -188,24 +209,24 @@ export function Sidebar({
       <div className="p-5 border-b border-border/50">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center glow">
+            <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center glow animate-glow-pulse">
               <Sparkles className="w-5 h-5 text-primary-foreground" />
             </div>
             <h1 className="text-xl font-bold text-gradient">ChatFlow</h1>
           </div>
-          {pendingRequests.length > 0 && (
+          {totalNotifications > 0 && (
             <div className="relative">
               <Bell className="w-5 h-5 text-muted-foreground" />
-              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 text-[10px] font-bold bg-gradient-accent text-accent-foreground rounded-full flex items-center justify-center animate-pulse-soft">
-                {pendingRequests.length}
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 text-[10px] font-bold bg-gradient-accent text-accent-foreground rounded-full flex items-center justify-center animate-bounce-in">
+                {totalNotifications}
               </span>
             </div>
           )}
         </div>
 
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <div className="relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <input
             type="text"
             placeholder="Search conversations..."
@@ -218,6 +239,16 @@ export function Sidebar({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-6">
+        {/* Room Invites */}
+        {roomInvites.length > 0 && onAcceptRoomInvite && onRejectRoomInvite && (
+          <RoomInviteNotification
+            invites={roomInvites}
+            onAccept={onAcceptRoomInvite}
+            onReject={onRejectRoomInvite}
+            onRoomJoined={onRoomInviteAccepted}
+          />
+        )}
+
         {/* Pending Friend Requests */}
         {pendingRequests.length > 0 && (
           <div className="p-4 rounded-2xl bg-gradient-to-br from-accent/10 to-primary/10 border border-accent/20 animate-fade-in">
@@ -306,7 +337,7 @@ export function Sidebar({
                   <DialogHeader>
                     <DialogTitle className="text-xl">Create a Channel</DialogTitle>
                     <DialogDescription>
-                      Create a new channel and invite your friends with a code
+                      Create a new channel and invite your friends
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-5 py-4">
@@ -354,25 +385,12 @@ export function Sidebar({
               </div>
             ) : (
               filteredRooms.map((room) => (
-                <div key={room.id} className="group relative">
-                  <RoomListItem
-                    room={room}
-                    isActive={room.id === activeRoomId}
-                    onClick={() => onSelectRoom(room.id)}
-                  />
-                  {room.inviteCode && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyInviteCode(room.inviteCode!);
-                      }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-primary/10 hover:bg-primary/20 opacity-0 group-hover:opacity-100 transition-all"
-                      title={`Copy: ${room.inviteCode}`}
-                    >
-                      <Copy className="w-3.5 h-3.5 text-primary" />
-                    </button>
-                  )}
-                </div>
+                <RoomListItem
+                  key={room.id}
+                  room={room}
+                  isActive={room.id === activeRoomId}
+                  onClick={() => onSelectRoom(room.id)}
+                />
               ))
             )}
           </CollapsibleContent>
@@ -492,7 +510,7 @@ export function Sidebar({
                       <span className="text-sm font-medium truncate block">{friend.username}</span>
                       <span className={cn(
                         "text-xs capitalize",
-                        friend.status === 'online' ? 'text-status-online' : 'text-muted-foreground'
+                        friend.status === 'online' ? 'text-green-400' : 'text-muted-foreground'
                       )}>
                         {friend.status}
                       </span>
@@ -542,7 +560,7 @@ export function Sidebar({
                 <p className="font-semibold text-sm truncate">{currentUser.username}</p>
                 <p className={cn(
                   "text-xs capitalize",
-                  currentUser.status === 'online' ? 'text-status-online' : 'text-muted-foreground'
+                  currentUser.status === 'online' ? 'text-green-400' : 'text-muted-foreground'
                 )}>
                   {currentUser.status}
                 </p>
