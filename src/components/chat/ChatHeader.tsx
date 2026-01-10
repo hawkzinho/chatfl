@@ -106,24 +106,24 @@ export function ChatHeader({
 
   return (
     <>
-      <div className="h-16 px-4 flex items-center justify-between border-b border-border bg-card/50 backdrop-blur-sm">
+      <div className="h-14 px-4 flex items-center justify-between border-b border-border bg-card">
         <div className="flex items-center gap-3 min-w-0">
           {isDirectMessage && otherUser ? (
             <UserAvatar
               src={otherUser.avatar}
               username={otherUser.username}
               status={otherUser.status}
-              size="md"
+              size="sm"
             />
           ) : (
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Hash className="w-5 h-5 text-primary" />
+            <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center">
+              <Hash className="w-4 h-4 text-muted-foreground" />
             </div>
           )}
           
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-foreground truncate">
+              <h2 className="font-medium text-foreground truncate">
                 {room.name}
               </h2>
               {room.inviteCode && (
@@ -131,10 +131,10 @@ export function ChatHeader({
                   <TooltipTrigger asChild>
                     <button
                       onClick={copyInviteCode}
-                      className="px-2 py-0.5 text-xs font-mono bg-muted rounded-md hover:bg-muted/80 transition-colors flex items-center gap-1"
+                      className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
                     >
-                      <span className="text-muted-foreground">{room.inviteCode}</span>
-                      <Copy className="w-3 h-3 text-muted-foreground" />
+                      {room.inviteCode}
+                      <Copy className="w-3 h-3" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>Copy invite code</TooltipContent>
@@ -144,7 +144,7 @@ export function ChatHeader({
             {isDirectMessage && otherUser ? (
               <p className={cn(
                 "text-xs capitalize",
-                otherUser.status === 'online' ? 'text-green-400' : 'text-muted-foreground'
+                otherUser.status === 'online' ? 'text-green-600' : 'text-muted-foreground'
               )}>
                 {otherUser.status}
               </p>
@@ -156,15 +156,15 @@ export function ChatHeader({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {!isDirectMessage && room.inviteCode && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button 
                   onClick={copyInviteLink}
-                  className="p-2 rounded-xl hover:bg-muted transition-colors hover:text-primary"
+                  className="p-2 rounded-md hover:bg-muted transition-colors"
                 >
-                  <Share2 className="w-5 h-5 text-muted-foreground" />
+                  <Share2 className="w-4 h-4 text-muted-foreground" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>Copy invite link</TooltipContent>
@@ -173,8 +173,8 @@ export function ChatHeader({
           {!isDirectMessage && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="p-2 rounded-xl hover:bg-muted transition-colors">
-                  <Users className="w-5 h-5 text-muted-foreground" />
+                <button className="p-2 rounded-md hover:bg-muted transition-colors">
+                  <Users className="w-4 h-4 text-muted-foreground" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>{room.members.length} members</TooltipContent>
@@ -183,8 +183,8 @@ export function ChatHeader({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="p-2 rounded-xl hover:bg-muted transition-colors">
-                <MoreVertical className="w-5 h-5 text-muted-foreground" />
+              <button className="p-2 rounded-md hover:bg-muted transition-colors">
+                <MoreVertical className="w-4 h-4 text-muted-foreground" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
