@@ -9,7 +9,9 @@ import {
   MoreVertical,
   Settings,
   LogOut,
-  Trash2
+  Trash2,
+  Link,
+  Share2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -67,6 +69,21 @@ export function ChatHeader({
   const isDirectMessage = room.type === 'direct';
   const otherUser = isDirectMessage ? room.members.find(m => m.id !== currentUserId) || room.members[0] : null;
   const onlineMembers = room.members.filter(m => m.status === 'online').length;
+
+  const getInviteLink = () => {
+    if (room.inviteCode) {
+      return `${window.location.origin}/invite/${room.inviteCode}`;
+    }
+    return null;
+  };
+
+  const copyInviteLink = () => {
+    const link = getInviteLink();
+    if (link) {
+      navigator.clipboard.writeText(link);
+      toast.success('Invite link copied!');
+    }
+  };
 
   const copyInviteCode = () => {
     if (room.inviteCode) {
@@ -140,6 +157,19 @@ export function ChatHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          {!isDirectMessage && room.inviteCode && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button 
+                  onClick={copyInviteLink}
+                  className="p-2 rounded-xl hover:bg-muted transition-colors hover:text-primary"
+                >
+                  <Share2 className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Copy invite link</TooltipContent>
+            </Tooltip>
+          )}
           {!isDirectMessage && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -159,10 +189,16 @@ export function ChatHeader({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               {room.inviteCode && (
-                <DropdownMenuItem onClick={copyInviteCode}>
-                  <Copy className="w-4 h-4 mr-2" />
-                  Copy Invite Code
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem onClick={copyInviteLink}>
+                    <Link className="w-4 h-4 mr-2" />
+                    Copy Invite Link
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={copyInviteCode}>
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy Invite Code
+                  </DropdownMenuItem>
+                </>
               )}
               
               {!isDirectMessage && (

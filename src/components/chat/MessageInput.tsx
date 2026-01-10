@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
 import { Message } from "@/types/chat";
+import { VoiceRecorder } from "./VoiceRecorder";
 import { 
   Send, 
   Paperclip, 
@@ -89,6 +90,11 @@ export function MessageInput({
     onTyping?.();
   };
 
+  const handleVoiceRecording = (blob: Blob) => {
+    const file = new File([blob], `voice-${Date.now()}.webm`, { type: 'audio/webm' });
+    onSend('🎤 Voice message', [file]);
+  };
+
   return (
     <div className="p-4 border-t border-border/50 glass-strong relative z-10">
       {/* Reply Preview */}
@@ -125,6 +131,11 @@ export function MessageInput({
                   alt={file.name}
                   className="w-full h-full object-cover"
                 />
+              ) : file.type.startsWith('audio/') ? (
+                <div className="w-full h-full flex flex-col items-center justify-center p-2 bg-primary/10">
+                  <span className="text-2xl mb-1">🎤</span>
+                  <span className="text-xs text-muted-foreground">Voice</span>
+                </div>
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center p-2">
                   <FileText className="w-8 h-8 text-muted-foreground mb-1" />
@@ -178,10 +189,13 @@ export function MessageInput({
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+            accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,audio/*"
             onChange={handleFileSelect}
             className="hidden"
           />
+
+          {/* Voice Recorder */}
+          <VoiceRecorder onRecordingComplete={handleVoiceRecording} disabled={disabled} />
 
           {/* Text Input */}
           <textarea
