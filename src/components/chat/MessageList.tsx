@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useLayoutEffect } from "react";
 import { Message } from "@/types/chat";
 import { MessageItem } from "./MessageItem";
 import { TypingIndicator } from "./TypingIndicator";
@@ -53,40 +53,22 @@ export function MessageList({
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const isNearBottomRef = useRef(true);
+  const shouldScrollRef = useRef(true);
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    if (endRef.current) {
-      endRef.current.scrollIntoView({ behavior });
+  // Scroll to bottom on initial load and new messages
+  useLayoutEffect(() => {
+    if (shouldScrollRef.current && endRef.current) {
+      endRef.current.scrollIntoView({ behavior: 'auto' });
     }
-  }, []);
+  }, [messages]);
 
-  // Check if user is near bottom
-  const checkIfNearBottom = useCallback(() => {
-    if (!containerRef.current) return true;
+  // Check if user is near bottom before new messages arrive
+  const handleScroll = () => {
+    if (!containerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const threshold = 150;
-    return scrollHeight - scrollTop - clientHeight < threshold;
-  }, []);
-
-  // Handle scroll event
-  const handleScroll = useCallback(() => {
-    isNearBottomRef.current = checkIfNearBottom();
-  }, [checkIfNearBottom]);
-
-  // Initial scroll and scroll on new messages
-  useEffect(() => {
-    if (isNearBottomRef.current) {
-      scrollToBottom('auto');
-    }
-  }, [messages, scrollToBottom]);
-
-  // Scroll on typing indicator change
-  useEffect(() => {
-    if (isNearBottomRef.current && typingUsers.length > 0) {
-      scrollToBottom();
-    }
-  }, [typingUsers, scrollToBottom]);
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    shouldScrollRef.current = isNearBottom;
+  };
 
   const shouldShowAvatar = (index: number): boolean => {
     if (index === 0) return true;
@@ -112,14 +94,13 @@ export function MessageList({
     <div 
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto scrollbar-thin py-4"
-      style={{ overflowAnchor: 'none' }}
+      className="flex-1 overflow-y-auto scrollbar-thin"
     >
       {messages.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-          <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
             <svg
-              className="w-10 h-10 text-muted-foreground/50"
+              className="w-8 h-8 text-muted-foreground/50"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -132,17 +113,17 @@ export function MessageList({
               />
             </svg>
           </div>
-          <p className="text-lg font-medium">No messages yet</p>
+          <p className="font-medium">No messages yet</p>
           <p className="text-sm">Start the conversation!</p>
         </div>
       ) : (
-        <div className="flex flex-col">
+        <div className="py-4">
           {messages.map((message, index) => (
             <div key={message.id}>
               {shouldShowDateSeparator(index) && (
-                <div className="flex items-center gap-4 px-4 py-4">
+                <div className="flex items-center gap-4 px-4 py-3">
                   <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs font-medium text-muted-foreground px-2">
+                  <span className="text-xs font-medium text-muted-foreground">
                     {formatDate(message.createdAt)}
                   </span>
                   <div className="flex-1 h-px bg-border" />
@@ -164,7 +145,7 @@ export function MessageList({
       )}
       
       <TypingIndicator users={typingUsers} />
-      <div ref={endRef} className="h-1" />
+      <div ref={endRef} />
     </div>
   );
 }
