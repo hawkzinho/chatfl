@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Message } from "@/types/chat";
 import { MessageItem } from "./MessageItem";
 import { TypingIndicator } from "./TypingIndicator";
@@ -51,18 +51,48 @@ export function MessageList({
   onDelete,
   onReact,
 }: MessageListProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
 
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    if (endRef.current) {
+      endRef.current.scrollIntoView({ behavior });
+    }
+  }, []);
+
+  // Check if user is near bottom
+  const checkIfNearBottom = useCallback(() => {
+    if (!containerRef.current) return true;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const threshold = 150;
+    return scrollHeight - scrollTop - clientHeight < threshold;
+  }, []);
+
+  // Handle scroll event
+  const handleScroll = useCallback(() => {
+    isNearBottomRef.current = checkIfNearBottom();
+  }, [checkIfNearBottom]);
+
+  // Initial scroll and scroll on new messages
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, typingUsers]);
+    if (isNearBottomRef.current) {
+      scrollToBottom('auto');
+    }
+  }, [messages, scrollToBottom]);
+
+  // Scroll on typing indicator change
+  useEffect(() => {
+    if (isNearBottomRef.current && typingUsers.length > 0) {
+      scrollToBottom();
+    }
+  }, [typingUsers, scrollToBottom]);
 
   const shouldShowAvatar = (index: number): boolean => {
     if (index === 0) return true;
     const currentMessage = messages[index];
     const previousMessage = messages[index - 1];
     
-    // Show avatar if different sender or more than 5 minutes apart
     if (currentMessage.senderId !== previousMessage.senderId) return true;
     
     const timeDiff =
@@ -79,7 +109,12 @@ export function MessageList({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-thin py-4">
+    <div 
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto scrollbar-thin py-4"
+      style={{ overflowAnchor: 'none' }}
+    >
       {messages.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
           <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
@@ -101,7 +136,7 @@ export function MessageList({
           <p className="text-sm">Start the conversation!</p>
         </div>
       ) : (
-        <>
+        <div className="flex flex-col">
           {messages.map((message, index) => (
             <div key={message.id}>
               {shouldShowDateSeparator(index) && (
@@ -125,11 +160,11 @@ export function MessageList({
               />
             </div>
           ))}
-        </>
+        </div>
       )}
       
       <TypingIndicator users={typingUsers} />
-      <div ref={endRef} />
+      <div ref={endRef} className="h-1" />
     </div>
   );
 }

@@ -3,6 +3,8 @@ import { cn } from "@/lib/utils";
 import { Message } from "@/types/chat";
 import { UserAvatar } from "./UserAvatar";
 import { MessageReactions } from "./MessageReactions";
+import { LinkText } from "./LinkText";
+import { AudioPlayer } from "./AudioPlayer";
 import { 
   MoreHorizontal, 
   Reply, 
@@ -47,6 +49,15 @@ const formatTime = (date: Date): string => {
 };
 
 const AttachmentPreview = ({ attachment }: { attachment: any }) => {
+  // Check if it's an audio file
+  if (attachment.type === 'audio' || attachment.mimeType?.startsWith('audio/')) {
+    return (
+      <div className="mt-3">
+        <AudioPlayer src={attachment.url} />
+      </div>
+    );
+  }
+
   if (attachment.type === 'image') {
     return (
       <a 
@@ -165,9 +176,11 @@ export function MessageItem({
             </div>
           )}
           
-          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-            {message.content}
-          </p>
+          {message.content && (
+            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+              <LinkText text={message.content} />
+            </p>
+          )}
 
           {message.attachments?.map((attachment) => (
             <AttachmentPreview key={attachment.id} attachment={attachment} />
