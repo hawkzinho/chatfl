@@ -115,14 +115,16 @@ const Index = () => {
     return await sendInvite(activeRoomId, friendId);
   };
 
+  const handleInviteFriendToRoom = async (friendId: string, roomId: string) => {
+    return await sendInvite(roomId, friendId);
+  };
+
   if (authLoading) {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center glow animate-pulse">
-            <Loader2 className="w-8 h-8 animate-spin text-primary-foreground" />
-          </div>
-          <p className="text-muted-foreground animate-pulse">Loading...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Carregando...</p>
         </div>
       </div>
     );
@@ -171,7 +173,7 @@ const Index = () => {
     const otherMember = r.members?.find(m => m.id !== user.id);
     return {
       id: r.id,
-      name: otherMember?.username || 'Unknown',
+      name: otherMember?.username || 'Desconhecido',
       type: 'direct' as const,
       avatar: otherMember?.avatar_url || undefined,
       members: r.members?.map(m => ({
@@ -212,9 +214,10 @@ const Index = () => {
     attachments: m.file_url ? [{
       id: m.id,
       type: m.file_type?.startsWith('image/') ? 'image' as const : 
-            m.file_type?.startsWith('video/') ? 'video' as const : 'document' as const,
+            m.file_type?.startsWith('video/') ? 'video' as const : 
+            m.file_type?.startsWith('audio/') ? 'audio' as const : 'document' as const,
       url: m.file_url,
-      name: m.file_name || 'file',
+      name: m.file_name || 'arquivo',
       size: 0,
       mimeType: m.file_type || '',
     }] : undefined,
@@ -237,7 +240,7 @@ const Index = () => {
   const activeChatRoom = activeRoom ? {
     id: activeRoom.id,
     name: activeRoom.type === 'direct' 
-      ? activeRoom.members?.find(m => m.id !== user.id)?.username || 'Unknown'
+      ? activeRoom.members?.find(m => m.id !== user.id)?.username || 'Desconhecido'
       : activeRoom.name,
     description: activeRoom.description || undefined,
     type: activeRoom.type as 'public' | 'private' | 'direct',
@@ -299,6 +302,7 @@ const Index = () => {
         onAcceptRoomInvite={acceptInvite}
         onRejectRoomInvite={rejectInvite}
         onRoomInviteAccepted={handleInviteAccepted}
+        onInviteFriendToRoom={handleInviteFriendToRoom}
       />
       
       <ChatView

@@ -9,17 +9,17 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 const signInSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z.string().email('Email inválido'),
+  password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
 });
 
 const signUpSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters').max(20, 'Username must be less than 20 characters'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  username: z.string().min(3, 'Nome de usuário deve ter pelo menos 3 caracteres').max(20, 'Nome de usuário deve ter menos de 20 caracteres'),
+  email: z.string().email('Email inválido'),
+  password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
+  message: "As senhas não coincidem",
   path: ['confirmPassword'],
 });
 
@@ -89,7 +89,7 @@ const Auth = () => {
     
     if (error) {
       if (error.message.includes('already registered')) {
-        toast.error('This email is already registered. Please sign in instead.');
+        toast.error('Este email já está registrado. Faça login.');
       } else {
         toast.error(error.message);
       }
@@ -110,7 +110,7 @@ const Auth = () => {
             </div>
           </div>
           <h1 className="text-2xl font-semibold">ChatFlow</h1>
-          <p className="text-sm text-muted-foreground">Sign in to continue</p>
+          <p className="text-sm text-muted-foreground">Entre para continuar</p>
         </div>
 
         {/* Auth Card */}
@@ -125,7 +125,7 @@ const Auth = () => {
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Sign In
+              Entrar
             </button>
             <button
               onClick={() => setActiveTab('signup')}
@@ -135,7 +135,7 @@ const Auth = () => {
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Sign Up
+              Cadastrar
             </button>
           </div>
 
@@ -147,7 +147,7 @@ const Auth = () => {
                 <Input
                   id="signin-email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder="voce@exemplo.com"
                   value={signInEmail}
                   onChange={(e) => setSignInEmail(e.target.value)}
                   required
@@ -155,7 +155,7 @@ const Auth = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="signin-password">Password</Label>
+                <Label htmlFor="signin-password">Senha</Label>
                 <Input
                   id="signin-password"
                   type="password"
@@ -170,10 +170,10 @@ const Auth = () => {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
+                    Entrando...
                   </>
                 ) : (
-                  'Sign In'
+                  'Entrar'
                 )}
               </Button>
             </form>
@@ -183,11 +183,11 @@ const Auth = () => {
           {activeTab === 'signup' && (
             <form onSubmit={handleSignUp} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="signup-username">Username</Label>
+                <Label htmlFor="signup-username">Nome de Usuário</Label>
                 <Input
                   id="signup-username"
                   type="text"
-                  placeholder="johndoe"
+                  placeholder="seunome"
                   value={signUpUsername}
                   onChange={(e) => setSignUpUsername(e.target.value)}
                   required
@@ -199,7 +199,7 @@ const Auth = () => {
                 <Input
                   id="signup-email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder="voce@exemplo.com"
                   value={signUpEmail}
                   onChange={(e) => setSignUpEmail(e.target.value)}
                   required
@@ -207,7 +207,7 @@ const Auth = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="signup-password">Password</Label>
+                <Label htmlFor="signup-password">Senha</Label>
                 <Input
                   id="signup-password"
                   type="password"
@@ -219,7 +219,7 @@ const Auth = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="signup-confirm">Confirm Password</Label>
+                <Label htmlFor="signup-confirm">Confirmar Senha</Label>
                 <Input
                   id="signup-confirm"
                   type="password"
@@ -234,10 +234,10 @@ const Auth = () => {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating account...
+                    Criando conta...
                   </>
                 ) : (
-                  'Create Account'
+                  'Criar Conta'
                 )}
               </Button>
             </form>

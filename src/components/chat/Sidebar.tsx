@@ -15,12 +15,17 @@ import {
   Link,
   Hash,
   Trash2,
-  MoreHorizontal
+  MoreHorizontal,
+  Users,
+  Moon,
+  Sun,
+  Settings
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -40,6 +45,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useTheme } from "next-themes";
 
 interface User {
   id: string;
@@ -112,6 +118,7 @@ interface SidebarProps {
   onAcceptRoomInvite?: (inviteId: string) => Promise<string | null>;
   onRejectRoomInvite?: (inviteId: string) => Promise<void>;
   onRoomInviteAccepted?: (roomId: string) => void;
+  onInviteFriendToRoom?: (friendId: string, roomId: string) => Promise<boolean>;
 }
 
 export function Sidebar({
@@ -135,6 +142,7 @@ export function Sidebar({
   onAcceptRoomInvite,
   onRejectRoomInvite,
   onRoomInviteAccepted,
+  onInviteFriendToRoom,
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [roomsOpen, setRoomsOpen] = useState(true);
@@ -143,10 +151,13 @@ export function Sidebar({
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [addFriendOpen, setAddFriendOpen] = useState(false);
   const [joinRoomOpen, setJoinRoomOpen] = useState(false);
+  const [inviteFriendOpen, setInviteFriendOpen] = useState(false);
+  const [selectedFriendForInvite, setSelectedFriendForInvite] = useState<string | null>(null);
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomDescription, setNewRoomDescription] = useState('');
   const [friendUsername, setFriendUsername] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const { theme, setTheme } = useTheme();
 
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -158,7 +169,7 @@ export function Sidebar({
 
   const handleCreateRoom = () => {
     if (!newRoomName.trim()) {
-      toast.error('Channel name is required');
+      toast.error('Nome do canal é obrigatório');
       return;
     }
     onCreateRoom?.(newRoomName, newRoomDescription);
@@ -169,7 +180,7 @@ export function Sidebar({
 
   const handleAddFriend = () => {
     if (!friendUsername.trim()) {
-      toast.error('Username is required');
+      toast.error('Nome de usuário é obrigatório');
       return;
     }
     onSendFriendRequest?.(friendUsername);
@@ -179,7 +190,7 @@ export function Sidebar({
 
   const handleJoinByCode = () => {
     if (!inviteCode.trim()) {
-      toast.error('Invite code is required');
+      toast.error('Código de convite é obrigatório');
       return;
     }
     onJoinByCode?.(inviteCode);
@@ -188,21 +199,45 @@ export function Sidebar({
   };
 
   const handleRemoveFriend = (friendshipId: string, username: string) => {
-    if (confirm(`Remove ${username} from your friends?`)) {
+    if (confirm(`Remover ${username} dos seus amigos?`)) {
       onRemoveFriend?.(friendshipId);
     }
   };
 
   const handleDeleteDM = async (roomId: string) => {
-    if (confirm('Delete this conversation?')) {
+    if (confirm('Excluir esta conversa?')) {
       await onLeaveRoom?.(roomId);
     }
   };
 
+  const handleInviteFriendToRoom = async (friendId: string) => {
+    if (!activeRoomId) {
+      toast.error('Selecione um canal primeiro');
+      return;
+    }
+    
+    const activeRoom = rooms.find(r => r.id === activeRoomId);
+    if (!activeRoom || activeRoom.type === 'direct') {
+      toast.error('Você só pode convidar amigos para canais');
+      return;
+    }
+
+    if (onInviteFriendToRoom) {
+      const success = await onInviteFriendToRoom(friendId, activeRoomId);
+      if (success) {
+        setInviteFriendOpen(false);
+        setSelectedFriendForInvite(null);
+      }
+    }
+  };
+
+  const activeRoom = rooms.find(r => r.id === activeRoomId);
+  const canInviteToRoom = activeRoom && activeRoom.type !== 'direct';
+
   return (
-    <div className="w-72 h-full flex flex-col bg-sidebar-background border-r border-sidebar-border">
+    <div className="w-72 h-full flex flex-col bg-card border-r border-border">
       {/* Header */}
-      <div className="p-4 border-b border-sidebar-border">
+      <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
             <MessageSquare className="w-4 h-4 text-primary-foreground" />
@@ -215,7 +250,7 @@ export function Sidebar({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Pesquisar..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 rounded-md bg-muted/50 border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
@@ -224,7 +259,7 @@ export function Sidebar({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3 space-y-4">
         {/* Room Invites */}
         {roomInvites.length > 0 && onAcceptRoomInvite && onRejectRoomInvite && (
           <RoomInviteNotification
@@ -240,7 +275,7 @@ export function Sidebar({
           <div className="p-3 rounded-md bg-muted/50 border border-border">
             <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
               <UserPlus className="w-3 h-3" />
-              Friend Requests
+              Solicitações de Amizade
             </p>
             <div className="space-y-2">
               {pendingRequests.map((request) => (
@@ -279,25 +314,25 @@ export function Sidebar({
           <div className="flex items-center justify-between mb-1">
             <CollapsibleTrigger className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
               <ChevronDown className={cn('w-3 h-3 transition-transform', !roomsOpen && '-rotate-90')} />
-              Channels ({rooms.length})
+              Canais ({rooms.length})
             </CollapsibleTrigger>
             <div className="flex gap-0.5">
               <Dialog open={joinRoomOpen} onOpenChange={setJoinRoomOpen}>
                 <DialogTrigger asChild>
-                  <button className="p-1.5 rounded hover:bg-muted transition-colors" title="Join with code">
+                  <button className="p-1.5 rounded hover:bg-muted transition-colors" title="Entrar com código">
                     <Link className="w-3.5 h-3.5 text-muted-foreground" />
                   </button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Join a Channel</DialogTitle>
+                    <DialogTitle>Entrar em um Canal</DialogTitle>
                     <DialogDescription>
-                      Enter an invite code to join an existing channel
+                      Digite o código de convite para entrar em um canal
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="invite-code">Invite Code</Label>
+                      <Label htmlFor="invite-code">Código de Convite</Label>
                       <Input
                         id="invite-code"
                         placeholder="ABC12345"
@@ -307,45 +342,45 @@ export function Sidebar({
                       />
                     </div>
                     <Button onClick={handleJoinByCode} className="w-full">
-                      Join Channel
+                      Entrar no Canal
                     </Button>
                   </div>
                 </DialogContent>
               </Dialog>
               <Dialog open={createRoomOpen} onOpenChange={setCreateRoomOpen}>
                 <DialogTrigger asChild>
-                  <button className="p-1.5 rounded hover:bg-muted transition-colors" title="Create channel">
+                  <button className="p-1.5 rounded hover:bg-muted transition-colors" title="Criar canal">
                     <Plus className="w-3.5 h-3.5 text-muted-foreground" />
                   </button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Create a Channel</DialogTitle>
+                    <DialogTitle>Criar um Canal</DialogTitle>
                     <DialogDescription>
-                      Create a new channel and invite your friends
+                      Crie um novo canal e convide seus amigos
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="room-name">Channel Name</Label>
+                      <Label htmlFor="room-name">Nome do Canal</Label>
                       <Input
                         id="room-name"
-                        placeholder="general"
+                        placeholder="geral"
                         value={newRoomName}
                         onChange={(e) => setNewRoomName(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="room-description">Description (optional)</Label>
+                      <Label htmlFor="room-description">Descrição (opcional)</Label>
                       <Input
                         id="room-description"
-                        placeholder="A place for general discussion"
+                        placeholder="Um lugar para conversas gerais"
                         value={newRoomDescription}
                         onChange={(e) => setNewRoomDescription(e.target.value)}
                       />
                     </div>
                     <Button onClick={handleCreateRoom} className="w-full">
-                      Create Channel
+                      Criar Canal
                     </Button>
                   </div>
                 </DialogContent>
@@ -356,12 +391,12 @@ export function Sidebar({
             {filteredRooms.length === 0 ? (
               <div className="px-3 py-6 text-center">
                 <Hash className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground mb-1">No channels yet</p>
+                <p className="text-sm text-muted-foreground mb-1">Nenhum canal ainda</p>
                 <button 
                   onClick={() => setCreateRoomOpen(true)}
                   className="text-sm text-primary hover:underline"
                 >
-                  Create one
+                  Criar um
                 </button>
               </div>
             ) : (
@@ -382,14 +417,14 @@ export function Sidebar({
           <div className="flex items-center justify-between mb-1">
             <CollapsibleTrigger className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
               <ChevronDown className={cn('w-3 h-3 transition-transform', !dmsOpen && '-rotate-90')} />
-              Messages ({directMessages.length})
+              Mensagens ({directMessages.length})
             </CollapsibleTrigger>
           </div>
           <CollapsibleContent className="space-y-0.5">
             {filteredDMs.length === 0 ? (
               <div className="px-3 py-6 text-center">
                 <MessageSquare className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No messages yet</p>
+                <p className="text-sm text-muted-foreground">Nenhuma mensagem ainda</p>
               </div>
             ) : (
               filteredDMs.map((dm) => (
@@ -405,7 +440,7 @@ export function Sidebar({
                       handleDeleteDM(dm.id);
                     }}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded bg-destructive/10 hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-all"
-                    title="Delete conversation"
+                    title="Excluir conversa"
                   >
                     <Trash2 className="w-3 h-3 text-destructive" />
                   </button>
@@ -420,33 +455,33 @@ export function Sidebar({
           <div className="flex items-center justify-between mb-1">
             <CollapsibleTrigger className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
               <ChevronDown className={cn('w-3 h-3 transition-transform', !friendsOpen && '-rotate-90')} />
-              Friends ({friends.length})
+              Amigos ({friends.length})
             </CollapsibleTrigger>
             <Dialog open={addFriendOpen} onOpenChange={setAddFriendOpen}>
               <DialogTrigger asChild>
-                <button className="p-1.5 rounded hover:bg-muted transition-colors" title="Add friend">
+                <button className="p-1.5 rounded hover:bg-muted transition-colors" title="Adicionar amigo">
                   <UserPlus className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Add a Friend</DialogTitle>
+                  <DialogTitle>Adicionar Amigo</DialogTitle>
                   <DialogDescription>
-                    Enter your friend's username to send them a request
+                    Digite o nome de usuário do seu amigo
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="friend-username">Username</Label>
+                    <Label htmlFor="friend-username">Nome de Usuário</Label>
                     <Input
                       id="friend-username"
-                      placeholder="Enter their username..."
+                      placeholder="Digite o nome de usuário..."
                       value={friendUsername}
                       onChange={(e) => setFriendUsername(e.target.value)}
                     />
                   </div>
                   <Button onClick={handleAddFriend} className="w-full">
-                    Send Friend Request
+                    Enviar Solicitação
                   </Button>
                 </div>
               </DialogContent>
@@ -456,12 +491,12 @@ export function Sidebar({
             {friends.length === 0 ? (
               <div className="px-3 py-6 text-center">
                 <UserPlus className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground mb-1">No friends yet</p>
+                <p className="text-sm text-muted-foreground mb-1">Nenhum amigo ainda</p>
                 <button 
                   onClick={() => setAddFriendOpen(true)}
                   className="text-sm text-primary hover:underline"
                 >
-                  Add one
+                  Adicionar um
                 </button>
               </div>
             ) : (
@@ -483,31 +518,44 @@ export function Sidebar({
                         "text-xs capitalize",
                         friend.status === 'online' ? 'text-green-600' : 'text-muted-foreground'
                       )}>
-                        {friend.status}
+                        {friend.status === 'online' ? 'Online' : 'Offline'}
                       </span>
                     </div>
                   </button>
-                  {friend.friendshipId && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem 
-                          onClick={() => handleRemoveFriend(friend.friendshipId!, friend.username)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Remove Friend
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {canInviteToRoom && onInviteFriendToRoom && (
+                        <DropdownMenuItem onClick={() => handleInviteFriendToRoom(friend.id)}>
+                          <Users className="w-4 h-4 mr-2" />
+                          Convidar para #{activeRoom?.name}
                         </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                      )}
+                      <DropdownMenuItem onClick={() => onStartDM?.(friend.id)}>
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        Enviar Mensagem
+                      </DropdownMenuItem>
+                      {friend.friendshipId && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => handleRemoveFriend(friend.friendshipId!, friend.username)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Remover Amigo
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               ))
             )}
@@ -516,7 +564,7 @@ export function Sidebar({
       </div>
 
       {/* User Section */}
-      <div className="p-3 border-t border-sidebar-border">
+      <div className="p-3 border-t border-border">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="w-full flex items-center gap-2 p-2 rounded-md hover:bg-muted transition-colors">
@@ -532,15 +580,30 @@ export function Sidebar({
                   "text-xs capitalize",
                   currentUser.status === 'online' ? 'text-green-600' : 'text-muted-foreground'
                 )}>
-                  {currentUser.status}
+                  {currentUser.status === 'online' ? 'Online' : 'Offline'}
                 </p>
               </div>
+              <Settings className="w-4 h-4 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="w-4 h-4 mr-2" />
+                  Modo Claro
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 mr-2" />
+                  Modo Escuro
+                </>
+              )}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onSignOut} className="text-destructive focus:text-destructive">
               <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
+              Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useLayoutEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Message } from "@/types/chat";
 import { MessageItem } from "./MessageItem";
 import { TypingIndicator } from "./TypingIndicator";
@@ -30,11 +30,11 @@ const formatDate = (date: Date): string => {
   yesterday.setDate(yesterday.getDate() - 1);
 
   if (isSameDay(d, today)) {
-    return 'Today';
+    return 'Hoje';
   } else if (isSameDay(d, yesterday)) {
-    return 'Yesterday';
+    return 'Ontem';
   } else {
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat('pt-BR', {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
@@ -53,21 +53,41 @@ export function MessageList({
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const shouldScrollRef = useRef(true);
+  const isUserScrollingRef = useRef(false);
+  const lastMessageCountRef = useRef(messages.length);
 
-  // Scroll to bottom on initial load and new messages
-  useLayoutEffect(() => {
-    if (shouldScrollRef.current && endRef.current) {
-      endRef.current.scrollIntoView({ behavior: 'auto' });
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // If new message added and user is near bottom, scroll to bottom
+    if (messages.length > lastMessageCountRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
+      
+      if (isNearBottom || !isUserScrollingRef.current) {
+        endRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
     }
-  }, [messages]);
+    
+    lastMessageCountRef.current = messages.length;
+  }, [messages.length]);
 
-  // Check if user is near bottom before new messages arrive
+  // Initial scroll to bottom
+  useEffect(() => {
+    if (messages.length > 0) {
+      endRef.current?.scrollIntoView({ behavior: 'auto' });
+    }
+  }, []);
+
   const handleScroll = () => {
-    if (!containerRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-    shouldScrollRef.current = isNearBottom;
+    const container = containerRef.current;
+    if (!container) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
+    isUserScrollingRef.current = !isNearBottom;
   };
 
   const shouldShowAvatar = (index: number): boolean => {
@@ -94,7 +114,8 @@ export function MessageList({
     <div 
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto scrollbar-thin"
+      className="h-full overflow-y-auto"
+      style={{ overflowY: 'auto' }}
     >
       {messages.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
@@ -113,8 +134,8 @@ export function MessageList({
               />
             </svg>
           </div>
-          <p className="font-medium">No messages yet</p>
-          <p className="text-sm">Start the conversation!</p>
+          <p className="font-medium">Nenhuma mensagem ainda</p>
+          <p className="text-sm">Comece a conversa!</p>
         </div>
       ) : (
         <div className="py-4">
@@ -145,7 +166,7 @@ export function MessageList({
       )}
       
       <TypingIndicator users={typingUsers} />
-      <div ref={endRef} />
+      <div ref={endRef} className="h-1" />
     </div>
   );
 }

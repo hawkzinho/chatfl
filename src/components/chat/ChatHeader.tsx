@@ -81,25 +81,25 @@ export function ChatHeader({
     const link = getInviteLink();
     if (link) {
       navigator.clipboard.writeText(link);
-      toast.success('Invite link copied!');
+      toast.success('Link de convite copiado!');
     }
   };
 
   const copyInviteCode = () => {
     if (room.inviteCode) {
       navigator.clipboard.writeText(room.inviteCode);
-      toast.success('Invite code copied!');
+      toast.success('Código de convite copiado!');
     }
   };
 
   const handleLeave = async () => {
-    if (confirm('Are you sure you want to leave this channel?')) {
+    if (confirm('Tem certeza que deseja sair deste canal?')) {
       await onLeaveRoom?.(room.id);
     }
   };
 
   const handleDelete = async () => {
-    if (confirm('Are you sure you want to delete this channel? This cannot be undone.')) {
+    if (confirm('Tem certeza que deseja excluir este canal? Isso não pode ser desfeito.')) {
       await onDeleteRoom?.(room.id);
     }
   };
@@ -137,7 +137,7 @@ export function ChatHeader({
                       <Copy className="w-3 h-3" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>Copy invite code</TooltipContent>
+                  <TooltipContent>Copiar código de convite</TooltipContent>
                 </Tooltip>
               )}
             </div>
@@ -146,11 +146,11 @@ export function ChatHeader({
                 "text-xs capitalize",
                 otherUser.status === 'online' ? 'text-green-600' : 'text-muted-foreground'
               )}>
-                {otherUser.status}
+                {otherUser.status === 'online' ? 'Online' : 'Offline'}
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                {room.description || `${room.members.length} members • ${onlineMembers} online`}
+                {room.description || `${room.members.length} membros • ${onlineMembers} online`}
               </p>
             )}
           </div>
@@ -167,7 +167,7 @@ export function ChatHeader({
                   <Share2 className="w-4 h-4 text-muted-foreground" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Copy invite link</TooltipContent>
+              <TooltipContent>Copiar link de convite</TooltipContent>
             </Tooltip>
           )}
           {!isDirectMessage && (
@@ -177,7 +177,7 @@ export function ChatHeader({
                   <Users className="w-4 h-4 text-muted-foreground" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>{room.members.length} members</TooltipContent>
+              <TooltipContent>{room.members.length} membros</TooltipContent>
             </Tooltip>
           )}
 
@@ -192,11 +192,11 @@ export function ChatHeader({
                 <>
                   <DropdownMenuItem onClick={copyInviteLink}>
                     <Link className="w-4 h-4 mr-2" />
-                    Copy Invite Link
+                    Copiar Link de Convite
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={copyInviteCode}>
                     <Copy className="w-4 h-4 mr-2" />
-                    Copy Invite Code
+                    Copiar Código
                   </DropdownMenuItem>
                 </>
               )}
@@ -205,7 +205,7 @@ export function ChatHeader({
                 <>
                   <DropdownMenuItem onClick={() => setEditorOpen(true)}>
                     <Settings className="w-4 h-4 mr-2" />
-                    Channel Settings
+                    Configurações do Canal
                   </DropdownMenuItem>
                   
                   <DropdownMenuSeparator />
@@ -216,7 +216,7 @@ export function ChatHeader({
                       className="text-destructive focus:text-destructive"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      Delete Channel
+                      Excluir Canal
                     </DropdownMenuItem>
                   ) : (
                     <DropdownMenuItem 
@@ -224,7 +224,7 @@ export function ChatHeader({
                       className="text-destructive focus:text-destructive"
                     >
                       <LogOut className="w-4 h-4 mr-2" />
-                      Leave Channel
+                      Sair do Canal
                     </DropdownMenuItem>
                   )}
                 </>

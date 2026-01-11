@@ -15,6 +15,7 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     return () => {
@@ -23,6 +24,9 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
       }
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
   }, []);
@@ -33,10 +37,42 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const getSupportedMimeType = () => {
+    const types = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg;codecs=opus',
+      'audio/mp4',
+      'audio/mpeg',
+      'audio/wav'
+    ];
+    
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported(type)) {
+        return type;
+      }
+    }
+    return 'audio/webm';
+  };
+
   const startRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100
+        } 
+      });
+      
+      streamRef.current = stream;
+      
+      const mimeType = getSupportedMimeType();
+      const mediaRecorder = new MediaRecorder(stream, { 
+        mimeType,
+        audioBitsPerSecond: 128000
+      });
+      
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -48,21 +84,31 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
 
       mediaRecorder.onstop = () => {
         setIsProcessing(true);
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        stream.getTracks().forEach(track => track.stop());
+        
+        const mimeType = mediaRecorder.mimeType || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        
+        // Stop all tracks
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
+        
         onRecordingComplete(blob);
         setIsProcessing(false);
         setRecordingTime(0);
+        chunksRef.current = [];
       };
 
-      mediaRecorder.start(100);
+      // Request data every 250ms for better audio capture
+      mediaRecorder.start(250);
       setIsRecording(true);
       
       timerRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
     } catch (error) {
-      console.error('Error accessing microphone:', error);
+      console.error('Erro ao acessar microfone:', error);
     }
   }, [onRecordingComplete]);
 
@@ -79,7 +125,7 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
 
   if (isProcessing) {
     return (
-      <div className="p-2 rounded-xl bg-muted/50">
+      <div className="p-2 rounded-lg bg-muted/50">
         <Loader2 className="w-5 h-5 animate-spin text-primary" />
       </div>
     );
@@ -96,12 +142,12 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
           <TooltipTrigger asChild>
             <button
               onClick={stopRecording}
-              className="p-2 rounded-xl bg-destructive/20 hover:bg-destructive/30 text-destructive transition-colors"
+              className="p-2 rounded-lg bg-destructive/20 hover:bg-destructive/30 text-destructive transition-colors"
             >
               <Square className="w-5 h-5" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Stop recording</TooltipContent>
+          <TooltipContent>Parar gravação</TooltipContent>
         </Tooltip>
       </div>
     );
@@ -114,14 +160,14 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
           onClick={startRecording}
           disabled={disabled}
           className={cn(
-            'p-2 rounded-xl hover:bg-muted/50 transition-colors',
+            'p-2 rounded-lg hover:bg-muted/50 transition-colors',
             disabled && 'opacity-50 cursor-not-allowed'
           )}
         >
           <Mic className="w-5 h-5 text-muted-foreground" />
         </button>
       </TooltipTrigger>
-      <TooltipContent>Record voice message</TooltipContent>
+      <TooltipContent>Gravar áudio</TooltipContent>
     </Tooltip>
   );
 }

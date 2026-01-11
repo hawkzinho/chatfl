@@ -57,7 +57,7 @@ export const useRoomInvites = () => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching invites:', error);
+      console.error('Erro ao buscar convites:', error);
       setLoading(false);
       return;
     }
@@ -113,13 +113,13 @@ export const useRoomInvites = () => {
             
             // Show browser notification
             if (Notification.permission === 'granted') {
-              new Notification(`${invite.sender.username} invited you!`, {
-                body: `Join channel: ${invite.room.name}`,
+              new Notification(`${invite.sender.username} te convidou!`, {
+                body: `Entrar no canal: ${invite.room.name}`,
                 icon: '/favicon.ico',
               });
             }
             
-            toast.success(`${invite.sender.username} invited you to join ${invite.room.name}!`, {
+            toast.success(`${invite.sender.username} te convidou para ${invite.room.name}!`, {
               duration: 5000,
             });
           }
@@ -144,7 +144,7 @@ export const useRoomInvites = () => {
       .maybeSingle();
 
     if (existingMember) {
-      toast.info('User is already a member of this channel');
+      toast.info('Usuário já é membro deste canal');
       return false;
     }
 
@@ -158,7 +158,7 @@ export const useRoomInvites = () => {
       .maybeSingle();
 
     if (existingInvite) {
-      toast.info('Invite already sent');
+      toast.info('Convite já enviado');
       return false;
     }
 
@@ -171,12 +171,12 @@ export const useRoomInvites = () => {
       });
 
     if (error) {
-      console.error('Error sending invite:', error);
-      toast.error('Failed to send invite');
+      console.error('Erro ao enviar convite:', error);
+      toast.error('Erro ao enviar convite');
       return false;
     }
 
-    toast.success('Invite sent!');
+    toast.success('Convite enviado!');
     return true;
   };
 
@@ -193,8 +193,8 @@ export const useRoomInvites = () => {
       .eq('id', inviteId);
 
     if (updateError) {
-      console.error('Error accepting invite:', updateError);
-      toast.error('Failed to accept invite');
+      console.error('Erro ao aceitar convite:', updateError);
+      toast.error('Erro ao aceitar convite');
       return null;
     }
 
@@ -208,13 +208,13 @@ export const useRoomInvites = () => {
       });
 
     if (joinError) {
-      console.error('Error joining room:', joinError);
-      toast.error('Failed to join channel');
+      console.error('Erro ao entrar no canal:', joinError);
+      toast.error('Erro ao entrar no canal');
       return null;
     }
 
     setPendingInvites(prev => prev.filter(i => i.id !== inviteId));
-    toast.success(`Joined ${invite.room.name}!`);
+    toast.success(`Você entrou em ${invite.room.name}!`);
     return invite.room_id;
   };
 
@@ -225,13 +225,13 @@ export const useRoomInvites = () => {
       .eq('id', inviteId);
 
     if (error) {
-      console.error('Error rejecting invite:', error);
-      toast.error('Failed to reject invite');
+      console.error('Erro ao recusar convite:', error);
+      toast.error('Erro ao recusar convite');
       return;
     }
 
     setPendingInvites(prev => prev.filter(i => i.id !== inviteId));
-    toast.info('Invite declined');
+    toast.info('Convite recusado');
   };
 
   return {
