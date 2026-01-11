@@ -40,7 +40,7 @@ export function MessageInput({
   replyTo,
   onCancelReply,
   disabled = false,
-  placeholder = 'Type a message...',
+  placeholder = 'Digite uma mensagem...',
 }: MessageInputProps) {
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -91,20 +91,28 @@ export function MessageInput({
   };
 
   const handleVoiceRecording = (blob: Blob) => {
-    const file = new File([blob], `voice-${Date.now()}.webm`, { type: 'audio/webm' });
-    onSend('🎤 Voice message', [file]);
+    // Get the correct extension based on mime type
+    const mimeType = blob.type || 'audio/webm';
+    let extension = 'webm';
+    if (mimeType.includes('ogg')) extension = 'ogg';
+    else if (mimeType.includes('mp4')) extension = 'mp4';
+    else if (mimeType.includes('mpeg') || mimeType.includes('mp3')) extension = 'mp3';
+    else if (mimeType.includes('wav')) extension = 'wav';
+    
+    const file = new File([blob], `audio-${Date.now()}.${extension}`, { type: mimeType });
+    onSend('🎤 Mensagem de voz', [file]);
   };
 
   return (
-    <div className="p-4 border-t border-border/50 glass-strong relative z-10">
+    <div className="p-4 border-t border-border bg-card">
       {/* Reply Preview */}
       {replyTo && (
-        <div className="flex items-center gap-3 mb-3 p-3 rounded-xl bg-primary/5 border border-primary/20 animate-slide-in">
-          <div className="w-1 h-10 rounded-full bg-gradient-primary" />
+        <div className="flex items-center gap-3 mb-3 p-3 rounded-lg bg-muted/50 border border-border">
+          <div className="w-1 h-10 rounded-full bg-primary" />
           <Reply className="w-4 h-4 text-primary flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <span className="text-xs text-primary font-semibold">
-              Replying to {replyTo.sender.username}
+            <span className="text-xs text-primary font-medium">
+              Respondendo a {replyTo.sender.username}
             </span>
             <p className="text-sm text-muted-foreground truncate">{replyTo.content}</p>
           </div>
@@ -123,7 +131,7 @@ export function MessageInput({
           {attachments.map((file, index) => (
             <div
               key={index}
-              className="relative flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-muted/50 border border-border/50 animate-bounce-in"
+              className="relative flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-muted border border-border"
             >
               {file.type.startsWith('image/') ? (
                 <img
@@ -134,7 +142,7 @@ export function MessageInput({
               ) : file.type.startsWith('audio/') ? (
                 <div className="w-full h-full flex flex-col items-center justify-center p-2 bg-primary/10">
                   <span className="text-2xl mb-1">🎤</span>
-                  <span className="text-xs text-muted-foreground">Voice</span>
+                  <span className="text-xs text-muted-foreground">Áudio</span>
                 </div>
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center p-2">
@@ -157,30 +165,30 @@ export function MessageInput({
 
       {/* Input Area */}
       <div className="flex items-end gap-3">
-        <div className="flex-1 flex items-end gap-2 p-4 rounded-2xl bg-muted/20 border border-border/50 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+        <div className="flex-1 flex items-end gap-2 p-3 rounded-lg bg-muted/50 border border-border focus-within:border-primary/50 transition-colors">
           {/* Attachment Button */}
           <DropdownMenu>
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="p-2 rounded-xl hover:bg-muted/50 transition-colors"
+                    className="p-2 rounded-lg hover:bg-muted transition-colors"
                     disabled={disabled}
                   >
                     <Paperclip className="w-5 h-5 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
-              <TooltipContent>Attach file</TooltipContent>
+              <TooltipContent>Anexar arquivo</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="start" className="glass-strong">
+            <DropdownMenuContent align="start">
               <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
                 <ImageIcon className="w-4 h-4 mr-2" />
-                Photo or Video
+                Foto ou Vídeo
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
                 <FileText className="w-4 h-4 mr-2" />
-                Document
+                Documento
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -209,7 +217,7 @@ export function MessageInput({
             className={cn(
               'flex-1 bg-transparent border-none outline-none resize-none',
               'text-sm text-foreground placeholder:text-muted-foreground',
-              'scrollbar-thin max-h-[150px]'
+              'max-h-[150px]'
             )}
           />
 
@@ -219,7 +227,7 @@ export function MessageInput({
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="p-2 rounded-xl hover:bg-muted/50 transition-colors"
+                    className="p-2 rounded-lg hover:bg-muted transition-colors"
                     disabled={disabled}
                   >
                     <Smile className="w-5 h-5 text-muted-foreground" />
@@ -228,12 +236,12 @@ export function MessageInput({
               </TooltipTrigger>
               <TooltipContent>Emoji</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="end" className="grid grid-cols-5 gap-1 p-3 glass-strong">
+            <DropdownMenuContent align="end" className="grid grid-cols-5 gap-1 p-3">
               {quickEmojis.map((emoji) => (
                 <button
                   key={emoji}
                   onClick={() => insertEmoji(emoji)}
-                  className="p-2 hover:bg-muted rounded-xl transition-all text-xl hover:scale-125"
+                  className="p-2 hover:bg-muted rounded-lg transition-all text-xl hover:scale-125"
                 >
                   {emoji}
                 </button>
@@ -249,16 +257,16 @@ export function MessageInput({
               onClick={handleSend}
               disabled={disabled || (!content.trim() && attachments.length === 0)}
               className={cn(
-                'p-4 rounded-2xl transition-all duration-300',
+                'p-3 rounded-lg transition-all',
                 content.trim() || attachments.length > 0
-                  ? 'bg-gradient-primary text-primary-foreground glow hover:opacity-90 scale-100'
-                  : 'bg-muted/50 text-muted-foreground scale-95 opacity-50'
+                  ? 'bg-primary text-primary-foreground hover:opacity-90'
+                  : 'bg-muted text-muted-foreground opacity-50'
               )}
             >
               <Send className="w-5 h-5" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Send message</TooltipContent>
+          <TooltipContent>Enviar mensagem</TooltipContent>
         </Tooltip>
       </div>
     </div>
