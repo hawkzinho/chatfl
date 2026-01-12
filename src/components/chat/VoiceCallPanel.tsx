@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "./UserAvatar";
 import { 
@@ -26,9 +26,6 @@ interface VoiceCallPanelProps {
   onClose?: () => void;
 }
 
-// Modern, pleasant ringtone
-const CALL_RINGTONE = 'data:audio/wav;base64,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';
-
 export function VoiceCallPanel({
   roomId,
   roomName,
@@ -41,6 +38,7 @@ export function VoiceCallPanel({
     isMuted,
     participants,
     callDuration,
+    activeCallInfo,
     joinCall,
     leaveCall,
     toggleMute,
@@ -75,6 +73,14 @@ export function VoiceCallPanel({
     return members.find(m => m.id === userId);
   };
 
+  // Determine the call button text based on active call state
+  const getCallButtonText = () => {
+    if (activeCallInfo.hasActiveCall && !isInCall) {
+      return `Entrar na chamada de ${activeCallInfo.starterName}`;
+    }
+    return 'Iniciar chamada';
+  };
+
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden">
       {/* Header */}
@@ -86,7 +92,7 @@ export function VoiceCallPanel({
             </h3>
             <p className="text-xs text-muted-foreground">#{roomName}</p>
           </div>
-          {isInCall && (
+          {(isInCall || activeCallInfo.hasActiveCall) && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Users className="w-3 h-3" />
               <span>{participants.length}</span>
@@ -143,18 +149,27 @@ export function VoiceCallPanel({
         )}
 
         {/* Controls */}
-        <div className="flex justify-center gap-3">
+        <div className="flex flex-col items-center gap-3">
           {!isInCall ? (
-            <Button
-              size="lg"
-              className="rounded-full w-14 h-14 bg-green-600 hover:bg-green-700"
-              onClick={handleJoinCall}
-              disabled={isJoining}
-            >
-              <Phone className="w-6 h-6" />
-            </Button>
-          ) : (
             <>
+              <Button
+                size="lg"
+                className="rounded-full w-14 h-14 bg-green-600 hover:bg-green-700"
+                onClick={handleJoinCall}
+                disabled={isJoining}
+              >
+                <Phone className="w-6 h-6" />
+              </Button>
+              {/* Show text about active call or start */}
+              <p className="text-xs text-muted-foreground text-center">
+                {activeCallInfo.hasActiveCall 
+                  ? `${activeCallInfo.participantCount} pessoa${activeCallInfo.participantCount !== 1 ? 's' : ''} na chamada. Clique para entrar.`
+                  : 'Clique para iniciar uma chamada de voz'
+                }
+              </p>
+            </>
+          ) : (
+            <div className="flex justify-center gap-3">
               <Button
                 variant={isMuted ? "destructive" : "outline"}
                 size="lg"
@@ -173,21 +188,9 @@ export function VoiceCallPanel({
               >
                 <PhoneOff className="w-5 h-5" />
               </Button>
-            </>
+            </div>
           )}
         </div>
-
-        {/* Instructions */}
-        {!isInCall && participants.length === 0 && (
-          <p className="text-xs text-muted-foreground text-center mt-3">
-            Clique para iniciar uma chamada de voz
-          </p>
-        )}
-        {!isInCall && participants.length > 0 && (
-          <p className="text-xs text-muted-foreground text-center mt-3">
-            {participants.length} pessoa{participants.length !== 1 ? 's' : ''} na chamada. Clique para entrar.
-          </p>
-        )}
       </div>
     </div>
   );

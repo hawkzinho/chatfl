@@ -13,6 +13,12 @@ interface Participant {
   is_active: boolean;
 }
 
+interface ActiveCallInfo {
+  hasActiveCall: boolean;
+  starterName?: string;
+  participantCount: number;
+}
+
 interface PeerConnection {
   peerId: string;
   connection: RTCPeerConnection;
@@ -46,6 +52,7 @@ export const useVoiceCall = (roomId: string | null) => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [callDuration, setCallDuration] = useState(0);
   const [callStartTime, setCallStartTime] = useState<Date | null>(null);
+  const [activeCallInfo, setActiveCallInfo] = useState<ActiveCallInfo>({ hasActiveCall: false, participantCount: 0 });
   
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, PeerConnection>>(new Map());
@@ -55,7 +62,7 @@ export const useVoiceCall = (roomId: string | null) => {
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const isJoiningRef = useRef(false);
 
-  // Fetch current participants
+  // Fetch current participants and update active call info
   const fetchParticipants = useCallback(async () => {
     if (!roomId) return [];
     
@@ -66,10 +73,12 @@ export const useVoiceCall = (roomId: string | null) => {
         user_id,
         is_muted,
         is_active,
+        joined_at,
         profiles:user_id (username, avatar_url)
       `)
       .eq('room_id', roomId)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .order('joined_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching participants:', error);
@@ -86,16 +95,34 @@ export const useVoiceCall = (roomId: string | null) => {
     }));
 
     setParticipants(formattedParticipants);
+    
+    // Update active call info
+    const hasActive = formattedParticipants.length > 0;
+    const starterName = formattedParticipants[0]?.username;
+    setActiveCallInfo({
+      hasActiveCall: hasActive,
+      starterName,
+      participantCount: formattedParticipants.length,
+    });
+
     return formattedParticipants;
   }, [roomId]);
+
+  // Check for active call on mount and periodically
+  useEffect(() => {
+    if (roomId) {
+      fetchParticipants();
+    }
+  }, [roomId, fetchParticipants]);
 
   // Create peer connection for a user
   const createPeerConnection = useCallback(async (peerId: string, initiator: boolean) => {
     if (!user || !roomId) return null;
     
     // Check if connection already exists
-    if (peerConnectionsRef.current.has(peerId)) {
-      return peerConnectionsRef.current.get(peerId)?.connection || null;
+    const existingConn = peerConnectionsRef.current.get(peerId);
+    if (existingConn && existingConn.connection.connectionState !== 'failed' && existingConn.connection.connectionState !== 'closed') {
+      return existingConn.connection;
     }
 
     console.log(`Creating peer connection with ${peerId}, initiator: ${initiator}`);
@@ -143,8 +170,7 @@ export const useVoiceCall = (roomId: string | null) => {
     pc.onconnectionstatechange = () => {
       console.log(`Connection state with ${peerId}: ${pc.connectionState}`);
       if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-        // Try to reconnect
-        console.log(`Connection ${pc.connectionState} with ${peerId}, cleaning up`);
+        console.log(`Connection ${pc.connectionState} with ${peerId}, will attempt reconnect on next signal`);
       }
     };
 
@@ -192,7 +218,13 @@ export const useVoiceCall = (roomId: string | null) => {
     let pc = peerConn?.connection;
 
     if (signal_type === 'offer') {
-      // Create connection if not exists
+      // Always create a new connection for offers (in case old one is stale)
+      if (pc && (pc.signalingState === 'closed' || pc.connectionState === 'failed')) {
+        pc.close();
+        peerConnectionsRef.current.delete(from_user_id);
+        pc = undefined;
+      }
+      
       if (!pc) {
         pc = await createPeerConnection(from_user_id, false);
       }
@@ -200,14 +232,11 @@ export const useVoiceCall = (roomId: string | null) => {
 
       try {
         if (pc.signalingState !== 'stable') {
-          console.log('Signaling state not stable, waiting...');
-          await Promise.all([
-            pc.setLocalDescription({ type: 'rollback' }),
-            pc.setRemoteDescription(new RTCSessionDescription(signal_data.offer))
-          ]);
-        } else {
-          await pc.setRemoteDescription(new RTCSessionDescription(signal_data.offer));
+          console.log('Signaling state not stable, rolling back...');
+          await pc.setLocalDescription({ type: 'rollback' });
         }
+        
+        await pc.setRemoteDescription(new RTCSessionDescription(signal_data.offer));
         
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -233,7 +262,7 @@ export const useVoiceCall = (roomId: string | null) => {
         }
       }
     } else if (signal_type === 'ice-candidate') {
-      if (pc && signal_data.candidate) {
+      if (pc && pc.remoteDescription && signal_data.candidate) {
         try {
           await pc.addIceCandidate(new RTCIceCandidate(signal_data.candidate));
           console.log(`Added ICE candidate from ${from_user_id}`);
@@ -392,8 +421,12 @@ export const useVoiceCall = (roomId: string | null) => {
     setIsInCall(false);
     setCallDuration(0);
     setCallStartTime(null);
+    
+    // Update active call info
+    await fetchParticipants();
+    
     toast.info('Você saiu da chamada');
-  }, [user, profile, roomId, participants, callStartTime]);
+  }, [user, profile, roomId, participants, callStartTime, fetchParticipants]);
 
   // Toggle mute
   const toggleMute = useCallback(async () => {
@@ -485,13 +518,6 @@ export const useVoiceCall = (roomId: string | null) => {
     };
   }, [roomId, user, isInCall, fetchParticipants, createPeerConnection, handleSignal]);
 
-  // Fetch participants on mount (for display even when not in call)
-  useEffect(() => {
-    if (roomId) {
-      fetchParticipants();
-    }
-  }, [roomId, fetchParticipants]);
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -515,6 +541,7 @@ export const useVoiceCall = (roomId: string | null) => {
     isMuted,
     participants,
     callDuration,
+    activeCallInfo,
     joinCall,
     leaveCall,
     toggleMute,
