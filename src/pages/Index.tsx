@@ -272,7 +272,7 @@ const Index = () => {
     <div className="h-screen bg-background flex overflow-hidden">
       <Sidebar
         rooms={sidebarRooms}
-        directMessages={directMessages}
+        directMessages={[]}
         currentUser={currentUser}
         activeRoomId={activeRoomId || ''}
         onSelectRoom={handleSelectRoom}

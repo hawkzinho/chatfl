@@ -2,8 +2,8 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "./UserAvatar";
 import { RoomEditorDialog } from "./RoomEditorDialog";
-import { VoiceCallDialog } from "./VoiceCallDialog";
-import { 
+import { GroupCallDialog } from "./GroupCallDialog";
+import {
   Hash,
   Users,
   Copy,
@@ -246,13 +246,13 @@ export function ChatHeader({
         />
       )}
 
-      <VoiceCallDialog
+      <GroupCallDialog
         open={callDialogOpen}
         onOpenChange={setCallDialogOpen}
+        roomId={room.id}
         roomName={room.name}
         members={room.members}
         currentUserId={currentUserId}
-        onEndCall={() => toast.info('Chamada encerrada')}
       />
     </>
   );
