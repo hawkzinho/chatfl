@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings, Trash2, Copy, RefreshCw } from "lucide-react";
+import { ProfilePhotoUpload } from "./ProfilePhotoUpload";
+import { Settings, Trash2, Copy, RefreshCw, Camera } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface RoomEditorDialogProps {
   open: boolean;
@@ -21,6 +23,7 @@ interface RoomEditorDialogProps {
     name: string;
     description?: string;
     inviteCode?: string;
+    avatar?: string;
   };
   onUpdate: (roomId: string, name: string, description: string) => Promise<void>;
   onDelete: (roomId: string) => Promise<void>;
@@ -39,22 +42,23 @@ export function RoomEditorDialog({
 }: RoomEditorDialogProps) {
   const [name, setName] = useState(room.name);
   const [description, setDescription] = useState(room.description || "");
+  const [avatarUrl, setAvatarUrl] = useState(room.avatar || "");
   const [loading, setLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("Channel name is required");
+      toast.error("Nome do canal é obrigatório");
       return;
     }
 
     setLoading(true);
     try {
       await onUpdate(room.id, name.trim(), description.trim());
-      toast.success("Channel updated!");
+      toast.success("Canal atualizado!");
       onOpenChange(false);
     } catch (error) {
-      toast.error("Failed to update channel");
+      toast.error("Erro ao atualizar canal");
     } finally {
       setLoading(false);
     }
@@ -69,10 +73,10 @@ export function RoomEditorDialog({
     setLoading(true);
     try {
       await onDelete(room.id);
-      toast.success("Channel deleted");
+      toast.success("Canal excluído");
       onOpenChange(false);
     } catch (error) {
-      toast.error("Failed to delete channel");
+      toast.error("Erro ao excluir canal");
     } finally {
       setLoading(false);
       setDeleteConfirm(false);
@@ -82,63 +86,115 @@ export function RoomEditorDialog({
   const copyInviteCode = () => {
     if (room.inviteCode) {
       navigator.clipboard.writeText(room.inviteCode);
-      toast.success("Invite code copied!");
+      toast.success("Código copiado!");
     }
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!confirm("Remover foto do grupo?")) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('chat_rooms')
+        .update({ avatar_url: null })
+        .eq('id', room.id);
+
+      if (error) throw error;
+
+      setAvatarUrl('');
+      toast.success("Foto removida!");
+    } catch (error: any) {
+      toast.error("Erro ao remover foto");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUploadComplete = (url: string) => {
+    setAvatarUrl(url);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="glass-strong border-border/50 sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <Settings className="w-5 h-5 text-primary" />
-            Channel Settings
+            Configurações do Canal
           </DialogTitle>
           <DialogDescription>
-            {isOwner ? "Manage your channel settings" : "View channel details"}
+            {isOwner ? "Gerencie as configurações do canal" : "Visualizar detalhes do canal"}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-4">
+          {/* Group Photo - Only for owners */}
+          {isOwner && (
+            <div className="flex flex-col items-center gap-3">
+              <Label className="self-start">Foto do Grupo</Label>
+              <ProfilePhotoUpload
+                currentImageUrl={avatarUrl}
+                onUploadComplete={handleUploadComplete}
+                type="group"
+                entityId={room.id}
+                size="lg"
+              />
+              <div className="flex gap-2">
+                {avatarUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRemovePhoto}
+                    disabled={loading}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Remover
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Channel Name */}
           <div className="space-y-2">
-            <Label htmlFor="room-name">Channel Name</Label>
+            <Label htmlFor="room-name">Nome do Canal</Label>
             <Input
               id="room-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={!isOwner}
-              className="h-12 rounded-xl"
             />
           </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="room-desc">Description</Label>
+            <Label htmlFor="room-desc">Descrição</Label>
             <Textarea
               id="room-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={!isOwner}
-              className="rounded-xl resize-none"
+              className="resize-none"
               rows={3}
-              placeholder="What's this channel about?"
+              placeholder="Sobre o que é este canal?"
             />
           </div>
 
           {/* Invite Code */}
           {room.inviteCode && (
             <div className="space-y-2">
-              <Label>Invite Code</Label>
+              <Label>Código de Convite</Label>
               <div className="flex gap-2">
-                <div className="flex-1 h-12 px-4 rounded-xl bg-muted/30 border border-border/50 flex items-center font-mono text-sm tracking-wider">
+                <div className="flex-1 h-10 px-4 rounded-md bg-muted border border-border flex items-center font-mono text-sm tracking-wider">
                   {room.inviteCode}
                 </div>
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={copyInviteCode}
-                  className="h-12 w-12 rounded-xl"
                 >
                   <Copy className="w-4 h-4" />
                 </Button>
@@ -147,7 +203,6 @@ export function RoomEditorDialog({
                     variant="outline"
                     size="icon"
                     onClick={() => onRegenerateCode(room.id)}
-                    className="h-12 w-12 rounded-xl"
                   >
                     <RefreshCw className="w-4 h-4" />
                   </Button>
@@ -163,18 +218,17 @@ export function RoomEditorDialog({
                 <Button
                   onClick={handleSave}
                   disabled={loading}
-                  className="flex-1 h-12 rounded-xl bg-gradient-primary hover:opacity-90"
+                  className="flex-1"
                 >
-                  Save Changes
+                  Salvar Alterações
                 </Button>
                 <Button
                   variant="destructive"
                   onClick={handleDelete}
                   disabled={loading}
-                  className="h-12 rounded-xl"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
-                  {deleteConfirm ? "Confirm?" : "Delete"}
+                  {deleteConfirm ? "Confirmar?" : "Excluir"}
                 </Button>
               </>
             )}
@@ -182,9 +236,9 @@ export function RoomEditorDialog({
               <Button
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="flex-1 h-12 rounded-xl"
+                className="flex-1"
               >
-                Close
+                Fechar
               </Button>
             )}
           </div>

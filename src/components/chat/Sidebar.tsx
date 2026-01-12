@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { RoomListItem } from "./RoomListItem";
 import { UserAvatar } from "./UserAvatar";
 import { RoomInviteNotification } from "./RoomInviteNotification";
-import { ProfilePhotoUpload } from "./ProfilePhotoUpload";
+import { ProfileSettingsDialog } from "./ProfileSettingsDialog";
 import { 
   Search, 
   Plus, 
@@ -20,7 +20,8 @@ import {
   Users,
   Moon,
   Sun,
-  Settings
+  Settings,
+  User
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -98,7 +99,6 @@ interface RoomInvite {
 interface SidebarProps {
   currentUser: User;
   rooms: ChatRoom[];
-  directMessages: ChatRoom[];
   activeRoomId?: string;
   onSelectRoom: (roomId: string) => void;
   onCreateRoom?: (name: string, description?: string) => void;
@@ -110,22 +110,17 @@ interface SidebarProps {
   onAcceptFriendRequest?: (requestId: string) => void;
   onRejectFriendRequest?: (requestId: string) => void;
   onRemoveFriend?: (friendshipId: string) => void;
-  onStartDM?: (friendId: string) => void;
   onJoinByCode?: (code: string) => void;
-  onDeleteRoom?: (roomId: string) => Promise<void>;
-  onLeaveRoom?: (roomId: string) => Promise<void>;
-  onUpdateRoom?: (roomId: string, name: string, description: string) => Promise<void>;
-  onRegenerateCode?: (roomId: string) => Promise<void>;
   onAcceptRoomInvite?: (inviteId: string) => Promise<string | null>;
   onRejectRoomInvite?: (inviteId: string) => Promise<void>;
   onRoomInviteAccepted?: (roomId: string) => void;
   onInviteFriendToRoom?: (friendId: string, roomId: string) => Promise<boolean>;
+  onProfileUpdate?: () => void;
 }
 
 export function Sidebar({
   currentUser,
   rooms,
-  directMessages,
   activeRoomId,
   onSelectRoom,
   onCreateRoom,
@@ -137,23 +132,20 @@ export function Sidebar({
   onAcceptFriendRequest,
   onRejectFriendRequest,
   onRemoveFriend,
-  onStartDM,
   onJoinByCode,
-  onLeaveRoom,
   onAcceptRoomInvite,
   onRejectRoomInvite,
   onRoomInviteAccepted,
   onInviteFriendToRoom,
+  onProfileUpdate,
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [roomsOpen, setRoomsOpen] = useState(true);
-  const [dmsOpen, setDmsOpen] = useState(true);
   const [friendsOpen, setFriendsOpen] = useState(true);
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [addFriendOpen, setAddFriendOpen] = useState(false);
   const [joinRoomOpen, setJoinRoomOpen] = useState(false);
-  const [inviteFriendOpen, setInviteFriendOpen] = useState(false);
-  const [selectedFriendForInvite, setSelectedFriendForInvite] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomDescription, setNewRoomDescription] = useState('');
   const [friendUsername, setFriendUsername] = useState('');
@@ -162,10 +154,6 @@ export function Sidebar({
 
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredDMs = directMessages.filter((dm) =>
-    dm.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleCreateRoom = () => {
@@ -205,12 +193,6 @@ export function Sidebar({
     }
   };
 
-  const handleDeleteDM = async (roomId: string) => {
-    if (confirm('Excluir esta conversa?')) {
-      await onLeaveRoom?.(roomId);
-    }
-  };
-
   const handleInviteFriendToRoom = async (friendId: string) => {
     if (!activeRoomId) {
       toast.error('Selecione um canal primeiro');
@@ -218,22 +200,18 @@ export function Sidebar({
     }
     
     const activeRoom = rooms.find(r => r.id === activeRoomId);
-    if (!activeRoom || activeRoom.type === 'direct') {
-      toast.error('Você só pode convidar amigos para canais');
+    if (!activeRoom) {
+      toast.error('Canal não encontrado');
       return;
     }
 
     if (onInviteFriendToRoom) {
-      const success = await onInviteFriendToRoom(friendId, activeRoomId);
-      if (success) {
-        setInviteFriendOpen(false);
-        setSelectedFriendForInvite(null);
-      }
+      await onInviteFriendToRoom(friendId, activeRoomId);
     }
   };
 
   const activeRoom = rooms.find(r => r.id === activeRoomId);
-  const canInviteToRoom = activeRoom && activeRoom.type !== 'direct';
+  const canInviteToRoom = !!activeRoom;
 
   return (
     <div className="w-72 h-full flex flex-col bg-card border-r border-border">
@@ -413,8 +391,6 @@ export function Sidebar({
           </CollapsibleContent>
         </Collapsible>
 
-        {/* DM Section Removed - Groups Only App */}
-
         {/* Friends Section */}
         <Collapsible open={friendsOpen} onOpenChange={setFriendsOpen}>
           <div className="flex items-center justify-between mb-1">
@@ -467,10 +443,7 @@ export function Sidebar({
             ) : (
               friends.map((friend) => (
                 <div key={friend.id} className="group relative">
-                  <button
-                    onClick={() => onStartDM?.(friend.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted transition-colors"
-                  >
+                  <div className="w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted transition-colors">
                     <UserAvatar
                       src={friend.avatar}
                       username={friend.username}
@@ -486,7 +459,7 @@ export function Sidebar({
                         {friend.status === 'online' ? 'Online' : 'Offline'}
                       </span>
                     </div>
-                  </button>
+                  </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
@@ -503,10 +476,6 @@ export function Sidebar({
                           Convidar para #{activeRoom?.name}
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem onClick={() => onStartDM?.(friend.id)}>
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        Enviar Mensagem
-                      </DropdownMenuItem>
                       {friend.friendshipId && (
                         <>
                           <DropdownMenuSeparator />
@@ -552,6 +521,10 @@ export function Sidebar({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+              <User className="w-4 h-4 mr-2" />
+              Editar Perfil
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
               {theme === 'dark' ? (
                 <>
@@ -573,6 +546,14 @@ export function Sidebar({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Profile Settings Dialog */}
+      <ProfileSettingsDialog
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+        user={currentUser}
+        onProfileUpdate={onProfileUpdate}
+      />
     </div>
   );
 }

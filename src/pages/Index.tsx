@@ -76,12 +76,9 @@ const Index = () => {
     }
   };
 
-  const handleStartDM = async (friendId: string) => {
-    const roomId = await startDirectMessage(friendId);
-    if (roomId) {
-      await refreshRooms();
-      setActiveRoomId(roomId);
-    }
+  // DM functionality removed - groups only app
+  const handleStartDM = async (_friendId: string) => {
+    toast.info('Este app suporta apenas grupos');
   };
 
   const handleJoinByCode = async (code: string) => {
