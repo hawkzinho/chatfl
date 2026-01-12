@@ -6,10 +6,11 @@ import {
   PhoneOff, 
   Mic, 
   MicOff, 
-  Users
+  Users,
+  Volume2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useVoiceCall } from "@/hooks/useVoiceCall";
+import { useVoiceCall, Participant } from "@/hooks/useVoiceCall";
 
 interface User {
   id: string;
@@ -73,16 +74,8 @@ export function VoiceCallPanel({
     return members.find(m => m.id === userId);
   };
 
-  // Determine the call button text based on active call state
-  const getCallButtonText = () => {
-    if (activeCallInfo.hasActiveCall && !isInCall) {
-      return `Entrar na chamada de ${activeCallInfo.starterName}`;
-    }
-    return 'Iniciar chamada';
-  };
-
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden">
+    <div className="bg-card border border-border rounded-lg overflow-hidden h-full flex flex-col">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border bg-muted/30">
         <div className="flex items-center justify-between">
@@ -102,35 +95,51 @@ export function VoiceCallPanel({
       </div>
 
       {/* Content */}
-      <div className="p-4">
+      <div className="p-4 flex-1 flex flex-col">
         {/* Active participants */}
         {participants.length > 0 && (
-          <div className="mb-4">
+          <div className="mb-4 flex-1">
             <p className="text-xs text-muted-foreground mb-2">Na chamada:</p>
-            <div className="flex flex-wrap gap-2">
+            <div className="space-y-2">
               {participants.map((participant) => {
                 const memberInfo = getParticipantInfo(participant.user_id);
+                const isCurrentUser = participant.user_id === currentUserId;
+                
                 return (
                   <div 
                     key={participant.id} 
-                    className="flex items-center gap-2 px-2 py-1 bg-muted/50 rounded-full"
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg transition-all",
+                      participant.isSpeaking && !participant.is_muted
+                        ? "bg-green-500/20 ring-2 ring-green-500/50" 
+                        : "bg-muted/50"
+                    )}
                   >
-                    <div className={cn(
-                      "relative",
-                      !participant.is_muted && "ring-2 ring-green-500 ring-offset-1 ring-offset-background rounded-full"
-                    )}>
+                    <div className="relative">
                       <UserAvatar
                         src={participant.avatar_url || memberInfo?.avatar}
                         username={participant.username}
                         status="online"
                         size="sm"
                       />
+                      {participant.isSpeaking && !participant.is_muted && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                          <Volume2 className="w-2 h-2 text-white" />
+                        </div>
+                      )}
                     </div>
-                    <span className="text-xs font-medium">
-                      {participant.user_id === currentUserId ? 'Você' : participant.username}
-                    </span>
-                    {participant.is_muted && (
-                      <MicOff className="w-3 h-3 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {isCurrentUser ? 'Você' : participant.username}
+                      </p>
+                      {participant.isSpeaking && !participant.is_muted && (
+                        <p className="text-xs text-green-500">Falando...</p>
+                      )}
+                    </div>
+                    {participant.is_muted ? (
+                      <MicOff className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <Mic className="w-4 h-4 text-green-500" />
                     )}
                   </div>
                 );
@@ -139,17 +148,34 @@ export function VoiceCallPanel({
           </div>
         )}
 
+        {/* No participants yet */}
+        {participants.length === 0 && !isInCall && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+                <Phone className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Nenhuma chamada ativa
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Call timer */}
         {isInCall && (
           <div className="text-center mb-4">
-            <div className="text-2xl font-mono font-bold text-foreground">
-              {formatDuration(callDuration)}
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-full">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-lg font-mono font-bold text-foreground">
+                {formatDuration(callDuration)}
+              </span>
             </div>
           </div>
         )}
 
         {/* Controls */}
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-3 mt-auto pt-4">
           {!isInCall ? (
             <>
               <Button
@@ -160,10 +186,9 @@ export function VoiceCallPanel({
               >
                 <Phone className="w-6 h-6" />
               </Button>
-              {/* Show text about active call or start */}
-              <p className="text-xs text-muted-foreground text-center">
+              <p className="text-xs text-muted-foreground text-center max-w-[200px]">
                 {activeCallInfo.hasActiveCall 
-                  ? `${activeCallInfo.participantCount} pessoa${activeCallInfo.participantCount !== 1 ? 's' : ''} na chamada. Clique para entrar.`
+                  ? `${activeCallInfo.participantCount} pessoa${activeCallInfo.participantCount !== 1 ? 's' : ''} na chamada iniciada por ${activeCallInfo.starterName}. Clique para entrar.`
                   : 'Clique para iniciar uma chamada de voz'
                 }
               </p>
