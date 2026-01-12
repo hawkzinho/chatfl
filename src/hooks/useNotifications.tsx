@@ -2,12 +2,15 @@ import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
+import { Phone, X } from 'lucide-react';
 
 // Modern, smooth notification sound (gentle pop/chime - WhatsApp style)
 const NOTIFICATION_SOUND = 'data:audio/wav;base64,UklGRsgCAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YaQCAAAFAAsAEgAaACMALAA2AD8ASABRAE1ATQBKAEQAPQA0ACoAHwATAAcA/P/w/+T/2f/O/8T/u/+z/6z/pv+h/53/mv+Y/5f/l/+Y/5r/nf+h/6b/rP+z/7v/xP/O/9n/5P/w//z/BwATAB8AKgA0AD0ARABKAEsARgA9ADIAJQAYAAoA/f/x/+X/2v/Q/8f/v/+4/7L/rf+p/6b/pf+k/6X/pv+p/6z/sP+1/7v/wv/J/9H/2f/i/+v/8//8/wQACwARABYAGgAdAB8AHwAdABoAFQAQAAkAAgD6//L/6v/j/9z/1f/Q/8v/x//E/8L/wf/A/8H/wv/E/8f/y//P/9T/2v/g/+b/7P/y//f//P8AAAQABwAJAAoACgAJAAcABAABAP7/+v/2//L/7f/p/+X/4f/d/9r/2P/W/9X/1P/U/9X/1v/X/9n/2//d/+D/4//m/+n/7P/v//L/9f/3//r//P/+/wAAAQACAAMAAwADAAIAAQAAAP///f/8//r/+f/3//b/9P/z//L/8f/w//D/8P/w//D/8f/x//L/8//0//X/9v/3//j/+f/6//v//P/8//3//v/+////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADw/+T/2P/M/8D/tP+o/53/kv+I/37/dP9r/2P/W/9U/03/R/9C/z7/O/84/zX/Mv8w/y//Lv8t/y3/Lf8u/y//MP8y/zX/OP87/z7/Qv9H/03/VP9b/2P/a/90/37/iP+S/53/qP+0/8D/zP/Y/+T/8P/8/wgAFAAg';
 
 // Call ringtone sound
 const CALL_RINGTONE = 'data:audio/wav;base64,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';
+
+const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 const playSound = (soundData: string, volume: number = 0.4) => {
   try {
@@ -33,9 +36,16 @@ const showBrowserNotification = (title: string, body: string) => {
   }
 };
 
+interface CallNotificationData {
+  roomId: string;
+  roomName: string;
+  starterName: string;
+}
+
 export const useNotifications = (currentRoomId: string | null) => {
   const { user } = useAuth();
   const lastMessageRef = useRef<string | null>(null);
+  const callNotificationsRef = useRef<Set<string>>(new Set());
 
   // Request notification permission on mount
   useEffect(() => {
@@ -63,12 +73,81 @@ export const useNotifications = (currentRoomId: string | null) => {
           // Don't notify for own messages
           if (newMessage.sender_id === user.id) return;
           
-          // Don't notify for messages in current active room (unless tab is hidden)
-          if (newMessage.room_id === currentRoomId && document.visibilityState === 'visible') return;
-          
           // Don't duplicate notifications
           if (lastMessageRef.current === newMessage.id) return;
           lastMessageRef.current = newMessage.id;
+
+          // Check if this is a call start system message
+          if (newMessage.sender_id === SYSTEM_USER_ID && newMessage.content.includes('iniciou uma chamada de voz')) {
+            // Don't notify if we already notified for this room's call
+            if (callNotificationsRef.current.has(newMessage.room_id)) return;
+            callNotificationsRef.current.add(newMessage.room_id);
+
+            // Extract the username from the message
+            const match = newMessage.content.match(/📞 (.+) iniciou uma chamada de voz/);
+            const starterName = match ? match[1] : 'Alguém';
+
+            // Get room info
+            const { data: roomData } = await supabase
+              .from('chat_rooms')
+              .select('name')
+              .eq('id', newMessage.room_id)
+              .single();
+
+            const roomName = roomData?.name || 'um grupo';
+
+            // Play ringtone
+            playSound(CALL_RINGTONE, 0.5);
+
+            // Show browser notification
+            showBrowserNotification(
+              'Chamada de voz iniciada',
+              `${starterName} iniciou uma chamada em ${roomName}`
+            );
+
+            // Show toast with Join/Ignore buttons
+            toast(
+              <div className="flex items-center gap-3">
+                <Phone className="w-5 h-5 text-green-500" />
+                <div className="flex-1">
+                  <p className="font-medium text-sm">{starterName} iniciou uma chamada</p>
+                  <p className="text-xs text-muted-foreground">em {roomName}</p>
+                </div>
+              </div>,
+              {
+                duration: 30000, // 30 seconds
+                action: {
+                  label: 'Entrar',
+                  onClick: () => {
+                    // Navigate to the room and open voice call
+                    window.dispatchEvent(new CustomEvent('join-voice-call', { 
+                      detail: { roomId: newMessage.room_id } 
+                    }));
+                  },
+                },
+                cancel: {
+                  label: 'Ignorar',
+                  onClick: () => {
+                    // Just dismiss
+                  },
+                },
+                onDismiss: () => {
+                  // Remove from set after some time so future calls can notify
+                  setTimeout(() => {
+                    callNotificationsRef.current.delete(newMessage.room_id);
+                  }, 60000); // 1 minute cooldown
+                },
+              }
+            );
+
+            return; // Don't show regular notification for call messages
+          }
+
+          // Skip system messages from regular notifications
+          if (newMessage.sender_id === SYSTEM_USER_ID) return;
+          
+          // Don't notify for messages in current active room (unless tab is hidden)
+          if (newMessage.room_id === currentRoomId && document.visibilityState === 'visible') return;
 
           // Fetch sender info
           const { data: senderData } = await supabase
