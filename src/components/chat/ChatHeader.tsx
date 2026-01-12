@@ -2,7 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "./UserAvatar";
 import { RoomEditorDialog } from "./RoomEditorDialog";
-import { GroupCallDialog } from "./GroupCallDialog";
+import { VoiceCallPanel } from "./VoiceCallPanel";
 import {
   Hash,
   Users,
@@ -13,7 +13,8 @@ import {
   Trash2,
   Link,
   Share2,
-  Phone
+  Phone,
+  X
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -27,6 +28,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { toast } from "sonner";
 
 interface User {
@@ -68,7 +75,7 @@ export function ChatHeader({
   onRegenerateCode,
 }: ChatHeaderProps) {
   const [editorOpen, setEditorOpen] = useState(false);
-  const [callDialogOpen, setCallDialogOpen] = useState(false);
+  const [voiceCallOpen, setVoiceCallOpen] = useState(false);
   const onlineMembers = room.members.filter(m => m.status === 'online').length;
 
   const getInviteLink = () => {
@@ -103,11 +110,6 @@ export function ChatHeader({
     if (confirm('Tem certeza que deseja excluir este canal? Isso não pode ser desfeito.')) {
       await onDeleteRoom?.(room.id);
     }
-  };
-
-  const handleStartCall = () => {
-    setCallDialogOpen(true);
-    toast.info('Chamada de voz iniciada!');
   };
 
   return (
@@ -148,13 +150,13 @@ export function ChatHeader({
           <Tooltip>
             <TooltipTrigger asChild>
               <button 
-                onClick={handleStartCall}
+                onClick={() => setVoiceCallOpen(true)}
                 className="p-2 rounded-md hover:bg-muted transition-colors"
               >
                 <Phone className="w-4 h-4 text-muted-foreground" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Iniciar chamada de voz</TooltipContent>
+            <TooltipContent>Chamada de voz</TooltipContent>
           </Tooltip>
 
           {room.inviteCode && (
@@ -238,6 +240,7 @@ export function ChatHeader({
             name: room.name,
             description: room.description,
             inviteCode: room.inviteCode,
+            avatar: room.avatar,
           }}
           onUpdate={onUpdateRoom}
           onDelete={onDeleteRoom}
@@ -246,14 +249,21 @@ export function ChatHeader({
         />
       )}
 
-      <GroupCallDialog
-        open={callDialogOpen}
-        onOpenChange={setCallDialogOpen}
-        roomId={room.id}
-        roomName={room.name}
-        members={room.members}
-        currentUserId={currentUserId}
-      />
+      {/* Voice Call Sheet */}
+      <Sheet open={voiceCallOpen} onOpenChange={setVoiceCallOpen}>
+        <SheetContent side="right" className="w-80 p-0">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Chamada de Voz</SheetTitle>
+          </SheetHeader>
+          <VoiceCallPanel
+            roomId={room.id}
+            roomName={room.name}
+            members={room.members}
+            currentUserId={currentUserId}
+            onClose={() => setVoiceCallOpen(false)}
+          />
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
