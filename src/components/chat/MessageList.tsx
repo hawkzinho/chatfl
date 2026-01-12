@@ -4,7 +4,14 @@ import { MessageItem } from "./MessageItem";
 import { TypingIndicator } from "./TypingIndicator";
 import { SystemMessage } from "./SystemMessage";
 
-const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
+// System messages are marked with this prefix
+const SYSTEM_MESSAGE_PREFIX = '🔔 SISTEMA: ';
+
+// Helper to check if message is a system message
+const isSystemMessage = (content: string) => content.startsWith(SYSTEM_MESSAGE_PREFIX);
+
+// Extract system message content without prefix
+const getSystemMessageContent = (content: string) => content.replace(SYSTEM_MESSAGE_PREFIX, '');
 
 interface MessageListProps {
   messages: Message[];
@@ -143,7 +150,7 @@ export function MessageList({
       ) : (
         <div className="py-4">
           {messages.map((message, index) => {
-            const isSystemMessage = message.senderId === SYSTEM_USER_ID;
+            const isSysMessage = isSystemMessage(message.content);
             
             return (
               <div key={message.id}>
@@ -156,9 +163,9 @@ export function MessageList({
                     <div className="flex-1 h-px bg-border" />
                   </div>
                 )}
-                {isSystemMessage ? (
+                {isSysMessage ? (
                   <SystemMessage 
-                    content={message.content} 
+                    content={getSystemMessageContent(message.content)} 
                     timestamp={message.createdAt} 
                   />
                 ) : (

@@ -3,6 +3,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
+// System message prefix for detection
+const SYSTEM_MESSAGE_PREFIX = '🔔 SISTEMA: ';
+
+// Send system message to chat
+const sendSystemMessage = async (roomId: string, userId: string, content: string) => {
+  await supabase.from('messages').insert({
+    room_id: roomId,
+    sender_id: userId,
+    content: SYSTEM_MESSAGE_PREFIX + content,
+  });
+};
+
 export interface Room {
   id: string;
   name: string;
@@ -150,20 +162,40 @@ export const useRooms = () => {
 
     if (error) {
       if (error.code === '23505') {
-        toast.info('You are already a member of this room');
+        toast.info('Você já é membro deste grupo');
       } else {
-        toast.error('Failed to join room');
+        toast.error('Falha ao entrar no grupo');
         console.error(error);
       }
       return;
     }
 
+    // Get username for system message
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .single();
+
+    // Send system message
+    await sendSystemMessage(roomId, user.id, `👋 ${profile?.username || 'Alguém'} entrou no grupo`);
+
     await fetchRooms();
-    toast.success('Joined room!');
+    toast.success('Entrou no grupo!');
   };
 
   const leaveRoom = async (roomId: string) => {
     if (!user) return;
+
+    // Get username for system message before leaving
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .single();
+
+    // Send system message first (while still a member)
+    await sendSystemMessage(roomId, user.id, `👋 ${profile?.username || 'Alguém'} saiu do grupo`);
 
     const { error } = await supabase
       .from('room_members')
@@ -172,13 +204,13 @@ export const useRooms = () => {
       .eq('user_id', user.id);
 
     if (error) {
-      toast.error('Failed to leave room');
+      toast.error('Falha ao sair do grupo');
       console.error(error);
       return;
     }
 
     await fetchRooms();
-    toast.info('Left room');
+    toast.info('Saiu do grupo');
   };
 
   const deleteRoom = async (roomId: string) => {
@@ -262,7 +294,7 @@ export const useRooms = () => {
       .maybeSingle();
 
     if (existing) {
-      toast.info('You are already in this room');
+      toast.info('Você já está neste grupo');
       return room.id;
     }
 
@@ -275,13 +307,23 @@ export const useRooms = () => {
       });
 
     if (error) {
-      toast.error('Failed to join room');
+      toast.error('Falha ao entrar no grupo');
       console.error(error);
       return null;
     }
 
+    // Get username for system message
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .single();
+
+    // Send system message
+    await sendSystemMessage(room.id, user.id, `👋 ${profile?.username || 'Alguém'} entrou no grupo`);
+
     await fetchRooms();
-    toast.success(`Joined ${room.name}!`);
+    toast.success(`Entrou em ${room.name}!`);
     return room.id;
   };
 

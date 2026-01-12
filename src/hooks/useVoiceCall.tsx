@@ -27,15 +27,15 @@ const ICE_SERVERS: RTCConfiguration = {
   ],
 };
 
-// Send system message to chat
-const sendSystemMessage = async (roomId: string, content: string) => {
-  // Use a special system user ID (we'll check for this when rendering)
-  const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
-  
+// System messages are marked with a special prefix
+const SYSTEM_MESSAGE_PREFIX = '🔔 SISTEMA: ';
+
+// Send system message to chat using the acting user's ID
+const sendSystemMessage = async (roomId: string, userId: string, content: string) => {
   await supabase.from('messages').insert({
     room_id: roomId,
-    sender_id: SYSTEM_USER_ID,
-    content: content,
+    sender_id: userId,
+    content: SYSTEM_MESSAGE_PREFIX + content,
   });
 };
 
@@ -301,9 +301,9 @@ export const useVoiceCall = (roomId: string | null) => {
       // Send system message
       const username = profile?.username || 'Alguém';
       if (isStartingCall) {
-        await sendSystemMessage(roomId, `📞 ${username} iniciou uma chamada de voz`);
+        await sendSystemMessage(roomId, user.id, `📞 ${username} iniciou uma chamada de voz`);
       } else {
-        await sendSystemMessage(roomId, `📞 ${username} entrou na chamada`);
+        await sendSystemMessage(roomId, user.id, `📞 ${username} entrou na chamada`);
       }
 
       // Fetch updated participants
@@ -378,9 +378,9 @@ export const useVoiceCall = (roomId: string | null) => {
     if (wasLastPerson && callStartTime) {
       const durationMinutes = Math.round((new Date().getTime() - callStartTime.getTime()) / 60000);
       const durationText = durationMinutes < 1 ? 'menos de 1 minuto' : `${durationMinutes} minuto${durationMinutes !== 1 ? 's' : ''}`;
-      await sendSystemMessage(roomId, `📞 ${username} saiu da chamada. A chamada durou ${durationText}`);
+      await sendSystemMessage(roomId, user.id, `📞 ${username} saiu da chamada. A chamada durou ${durationText}`);
     } else {
-      await sendSystemMessage(roomId, `📞 ${username} saiu da chamada`);
+      await sendSystemMessage(roomId, user.id, `📞 ${username} saiu da chamada`);
     }
 
     // Stop timer
