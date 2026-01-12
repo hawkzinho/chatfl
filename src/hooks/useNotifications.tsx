@@ -3,13 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
-// Notification sound as base64
-const NOTIFICATION_SOUND = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQQF/5nfz5ZYEBog0+2oYA4YGLzt3pBOCgsJ0ujGkVQQDBrg7N+SQBILFOLY0ptXDAwb4u3cnEgMCxLf4dWaWA4OGOHt3ZtIDgsV4ePWm1oODxri7t6dSw8MF+Lj15xbEA8Z4u7fnU0QDRfj5NidXBAPGeHu4J1OERAX4+XYnV0REBnh7uCeThEQF+Pl2Z5eERIa4e/gn1ASERjk5dmeXhISGuDv4Z9QEhEY5OXanlwREhrg7+GfURIRGOTm2Z5cERIa4O/hn1ESERjk5tqeXRESGuDv4qBQExIY5ObanlwSExrg8OGgURMTGeTm2p9cEhMb4O/ioFETExnk5tqfXRMTG+Dv4qBRExMZ5OfaoF0TExvg8OKgURQTGeTn2qBdExQb4PDioVEUExrk59uhXhMUG+Dw46FRFBQa5OjboV4UFBzg8eOhUhQUGuTo26FeFBQc4PHjoVIUFBrk6NuhXhQUHODx46FSFBUV5Ojbo14UFRzg8eOhUhQUGuTo26JeFBQc4PHkoVIUFBrl6NuiXhQVHODy5KJSFBUV5ejbo14VFR3h8uSiUxUVG+Xp26NfFRUd4fLlolMVFRvl6dyjXxUVHeLy5aJTFRUb5enco18VFh3i8uWjUxYVG+Xp3KRfFRYd4vLlpFQWFRvl6d2kYBYWHeLz5aRUFhYb5endpGAWFh3i8+akVBYWG+bp3aRgFhYd4vPmpFQWFhzl6d6kYBYWHeLz5qRUFhYc5enepGAWFh3i8+akVBYWHOXp3qVgFhYd4vPmpFQWFhzl6d6lYBYWHeLz5qRUFhYc5enepl8WFh3i9OakVBYWHOXp3qZgFhYd4vTmpFQWFhzl6t6mYBYWHeLz5qRUFhYc5erepWAWFh3i9OakVBYWHOXq3qVgFhYd4vTmpFQWFhzl6t+lYBYWHeLz5qRUFhYc5erfpWAWFh3i9OamVBcWHOXq36VgFxcd4vTmpFQXFhzl6t+lYBcXHeL05qVUFxYc5erfpmAXFx3j9OamVBcWHObq36ZgFxcd4/TmpVQXFhzm6t+mYBcXHeP05qVUFxYc5urfpmAXFx3j9OelVBcXHObq4KZgFxcd4/TnpVQXFxzm6uCmYBcXHeP056VUFxcc5urgpmAXFx3j9OelVBcXHObq4KZgFxcd4/TnpVQXFxzm6uCmYBcXHeP056VUFxcc5urgpmA=';
+// Modern, smooth notification sound (gentle pop/chime)
+const NOTIFICATION_SOUND = 'data:audio/wav;base64,UklGRpQDAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YXADAAAAAAoAFAAeACgAMgA8AEYAUABWAF4AYgBoAGwAbgBuAGwAaABiAFoAUABGADoALgAiABYACgAAAPoA8ADmANwA0gDKAMIAvAC4ALQAsgCwALIAtAC4AL4AxgDOANgA4gDsAPgAAgEOARoBJAEuATgBQAFIAU4BUgFUAVQBUgFOAUgBQAE2ASoBHgESAQQB+ADqANwAzgDCALQAqACcAJIAiACAAHoAdgByAHAAcAByAHYAfACCAIoAlACeAKoAtgDEANIA4gDwAAABEAEgATABPgFMAVgBZAFuAXYBfAGAAYIBgAF+AXgBcAFmAVoBTAE8ASwBGgEIAfQA3gDIALIAnACGAHIAXgBMADwALAAeABIACAAAAAAAAAAAAAAACAAQABwAKgA4AEgAWABqAHwAjgCgALIAxADWAOYA9gAEARABHAEmAS4BNgE6ATwBOgE2ATABJgEaAQ4B/gDuANwAyAC0AJ4AiAByAFwASAAyAB4ADAAAAPb/5P/S/8L/sv+k/5b/iv+A/3j/cP9s/2j/aP9o/2z/cv96/4L/jP+Y/6T/sv/C/9L/5P/2/wgAHAAwAEQAWABsAIAAkgCkALQAxADSAN4A6ADwAPgA/AD+AP4A/ADwAOIA0gDAAKoAkgB4AFoAOAAWAPT/zv+k/3r/Tv8i//T+xv6Y/mr+PP4Q/uT9uP2O/WT9PP0W/fL80PywfJJ8cHxQfDJ8FnwAfOx72HvIe7h7sHuoe6R7oHuge6R7rHu0e8B7znvge/R7Cnwi/Dz8WPx2fJZ8uHzcfAB9Jn1OfXZ9oH3KffR9IH5Mfnh+pn7Sfu5+Bn8efzJ/Rn9Uf2B/aH9uf3J/dH90f3J/bH9kf1p/Tn9Afyx/FH/8fuB+wn6ifn5+Wn40fg7+5v2+/ZT9av1A/Rb97PzC/Jj8cPxI/CD8+vvW+7L7kPtw+1D7Mvsa+wL76vrW+sT6tPqm+pj6jvqE+oD6fvp++oD6hPqM+pb6ovqw+sD60vrm+vr6EPsm+z77WPt0+5D7rvvO+/D7EvwyfFR8eHycfL582nz6fBx9QH1mfYx9tH3cfQZ+MH5afob+sv7e/gr/OP9m/5b/yP/4/ygAXACQAMQA+AAtAWEBlQHJAf0BMQJQ';
 
 const playSound = () => {
   try {
     const audio = new Audio(NOTIFICATION_SOUND);
-    audio.volume = 0.5;
+    audio.volume = 0.4;
     audio.play().catch(() => {});
   } catch (e) {
     console.log('Audio play failed:', e);
@@ -70,14 +70,14 @@ export const useNotifications = (currentRoomId: string | null) => {
             .eq('id', newMessage.sender_id)
             .single();
 
-          const senderName = senderData?.username || 'Someone';
+          const senderName = senderData?.username || 'Alguém';
           
           // Play sound
           playSound();
           
           // Show browser notification
           showBrowserNotification(
-            `New message from ${senderName}`,
+            `Nova mensagem de ${senderName}`,
             newMessage.content.substring(0, 50) + (newMessage.content.length > 50 ? '...' : '')
           );
           
