@@ -22,37 +22,21 @@ const Index = () => {
   
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-  const [voiceCallPanelOpen, setVoiceCallPanelOpen] = useState(false);
   
   const { messages, loading: messagesLoading, sendMessage, editMessage, deleteMessage, addReaction, removeReaction } = useMessages(activeRoomId);
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(activeRoomId);
   
-  // Initialize notifications (sound and browser notifications)
+  // Initialize notifications (sound and browser notifications for regular messages only)
   useNotifications(activeRoomId);
   
   // Request microphone permission on site load
   const { requestPermission: requestMicPermission, permissionState } = useMicrophonePermission();
   
   useEffect(() => {
-    // Request microphone permission if not already granted
     if (permissionState === 'prompt' || permissionState === 'unknown') {
       requestMicPermission();
     }
   }, [permissionState, requestMicPermission]);
-
-  // Listen for voice call join events from notifications
-  useEffect(() => {
-    const handleJoinVoiceCall = (event: CustomEvent<{ roomId: string }>) => {
-      const { roomId } = event.detail;
-      setActiveRoomId(roomId);
-      setVoiceCallPanelOpen(true);
-    };
-
-    window.addEventListener('join-voice-call', handleJoinVoiceCall as EventListener);
-    return () => {
-      window.removeEventListener('join-voice-call', handleJoinVoiceCall as EventListener);
-    };
-  }, []);
 
   // Redirect to auth if not logged in
   useEffect(() => {

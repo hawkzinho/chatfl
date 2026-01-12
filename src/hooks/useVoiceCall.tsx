@@ -14,16 +14,9 @@ export interface Participant {
   isSpeaking?: boolean;
 }
 
-interface ActiveCallInfo {
-  hasActiveCall: boolean;
-  starterName?: string;
-  participantCount: number;
-}
-
 interface PeerConnection {
   peerId: string;
   connection: RTCPeerConnection;
-  audioStream?: MediaStream;
 }
 
 const ICE_SERVERS: RTCConfiguration = {
@@ -31,25 +24,7 @@ const ICE_SERVERS: RTCConfiguration = {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
   ],
-};
-
-// System messages are marked with a special prefix
-const SYSTEM_MESSAGE_PREFIX = '🔔 SISTEMA: ';
-
-// Send system message to chat using the acting user's ID
-const sendSystemMessage = async (roomId: string, userId: string, content: string) => {
-  try {
-    await supabase.from('messages').insert({
-      room_id: roomId,
-      sender_id: userId,
-      content: SYSTEM_MESSAGE_PREFIX + content,
-    });
-  } catch (error) {
-    console.error('Error sending system message:', error);
-  }
 };
 
 export const useVoiceCall = (roomId: string | null) => {
@@ -58,8 +33,6 @@ export const useVoiceCall = (roomId: string | null) => {
   const [isMuted, setIsMuted] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [callDuration, setCallDuration] = useState(0);
-  const [callStartTime, setCallStartTime] = useState<Date | null>(null);
-  const [activeCallInfo, setActiveCallInfo] = useState<ActiveCallInfo>({ hasActiveCall: false, participantCount: 0 });
   
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, PeerConnection>>(new Map());
@@ -73,7 +46,7 @@ export const useVoiceCall = (roomId: string | null) => {
   const isJoiningRef = useRef(false);
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidate[]>>(new Map());
 
-  // Fetch current participants and update active call info
+  // Fetch current participants
   const fetchParticipants = useCallback(async () => {
     if (!roomId) return [];
     
@@ -107,16 +80,6 @@ export const useVoiceCall = (roomId: string | null) => {
     }));
 
     setParticipants(formattedParticipants);
-    
-    // Update active call info
-    const hasActive = formattedParticipants.length > 0;
-    const starterName = formattedParticipants[0]?.username;
-    setActiveCallInfo({
-      hasActiveCall: hasActive,
-      starterName,
-      participantCount: formattedParticipants.length,
-    });
-
     return formattedParticipants;
   }, [roomId]);
 
@@ -125,12 +88,12 @@ export const useVoiceCall = (roomId: string | null) => {
     if (roomId) {
       fetchParticipants();
       
-      // Poll for participants every 5 seconds when not in call
+      // Poll for participants every 3 seconds when not in call
       const pollInterval = setInterval(() => {
         if (!isInCall) {
           fetchParticipants();
         }
-      }, 5000);
+      }, 3000);
       
       return () => clearInterval(pollInterval);
     }
@@ -202,7 +165,6 @@ export const useVoiceCall = (roomId: string | null) => {
         existingConn.connection.connectionState !== 'failed' && 
         existingConn.connection.connectionState !== 'closed' &&
         existingConn.connection.connectionState !== 'disconnected') {
-      console.log(`Reusing existing connection with ${peerId}`);
       return existingConn.connection;
     }
 
@@ -212,23 +174,21 @@ export const useVoiceCall = (roomId: string | null) => {
       peerConnectionsRef.current.delete(peerId);
     }
 
-    console.log(`Creating new peer connection with ${peerId}, initiator: ${initiator}`);
+    console.log(`Creating peer connection with ${peerId}, initiator: ${initiator}`);
     const pc = new RTCPeerConnection(ICE_SERVERS);
     
     // Add local stream tracks
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
-        console.log(`Adding local track to peer connection: ${track.kind}`);
         pc.addTrack(track, localStreamRef.current!);
       });
     }
 
     // Handle incoming audio
     pc.ontrack = (event) => {
-      console.log(`Received remote track from ${peerId}:`, event.track.kind);
+      console.log(`Received remote track from ${peerId}`);
       const [remoteStream] = event.streams;
       if (remoteStream && event.track.kind === 'audio') {
-        // Create or update audio element
         let audioEl = audioElementsRef.current.get(peerId);
         if (!audioEl) {
           audioEl = new Audio();
@@ -238,10 +198,7 @@ export const useVoiceCall = (roomId: string | null) => {
         }
         audioEl.srcObject = remoteStream;
         
-        // Resume AudioContext if suspended (browser autoplay policy)
-        audioEl.play().catch(e => {
-          console.log('Audio play error (will retry):', e);
-          // Retry on user interaction
+        audioEl.play().catch(() => {
           const resumeAudio = () => {
             audioEl?.play().catch(() => {});
             audioContextRef.current?.resume();
@@ -250,7 +207,6 @@ export const useVoiceCall = (roomId: string | null) => {
           document.addEventListener('click', resumeAudio);
         });
         
-        // Setup analyser for speaking detection
         setupAudioAnalyser(peerId, remoteStream);
       }
     };
@@ -258,7 +214,6 @@ export const useVoiceCall = (roomId: string | null) => {
     // Handle ICE candidates
     pc.onicecandidate = async (event) => {
       if (event.candidate) {
-        console.log(`Sending ICE candidate to ${peerId}`);
         await supabase.from('voice_call_signals').insert({
           room_id: roomId,
           from_user_id: user.id,
@@ -270,21 +225,14 @@ export const useVoiceCall = (roomId: string | null) => {
     };
 
     pc.oniceconnectionstatechange = () => {
-      console.log(`ICE connection state with ${peerId}: ${pc.iceConnectionState}`);
-      
-      // Handle failed connections
       if (pc.iceConnectionState === 'failed') {
-        console.log(`Connection failed with ${peerId}, attempting restart`);
         pc.restartIce();
       }
     };
 
     pc.onconnectionstatechange = () => {
-      console.log(`Connection state with ${peerId}: ${pc.connectionState}`);
-      
       if (pc.connectionState === 'connected') {
-        console.log(`✓ Connected with ${peerId}`);
-        toast.success(`Conectado com ${participants.find(p => p.user_id === peerId)?.username || 'participante'}`);
+        console.log(`Connected with ${peerId}`);
       }
     };
 
@@ -293,10 +241,7 @@ export const useVoiceCall = (roomId: string | null) => {
     // If initiator, create and send offer
     if (initiator) {
       try {
-        console.log(`Creating offer for ${peerId}`);
-        const offer = await pc.createOffer({
-          offerToReceiveAudio: true,
-        });
+        const offer = await pc.createOffer({ offerToReceiveAudio: true });
         await pc.setLocalDescription(offer);
         
         await supabase.from('voice_call_signals').insert({
@@ -306,30 +251,25 @@ export const useVoiceCall = (roomId: string | null) => {
           signal_type: 'offer',
           signal_data: { offer: pc.localDescription?.toJSON() },
         } as any);
-        console.log(`Offer sent to ${peerId}`);
       } catch (err) {
         console.error('Error creating offer:', err);
       }
     }
 
     return pc;
-  }, [user, roomId, setupAudioAnalyser, participants]);
+  }, [user, roomId, setupAudioAnalyser]);
 
   // Handle incoming signal
   const handleSignal = useCallback(async (signal: any) => {
     if (!user || !localStreamRef.current) return;
     
     const { from_user_id, signal_type, signal_data } = signal;
-    
     if (from_user_id === user.id) return;
-
-    console.log(`Received signal ${signal_type} from ${from_user_id}`);
 
     let peerConn = peerConnectionsRef.current.get(from_user_id);
     let pc = peerConn?.connection;
 
     if (signal_type === 'offer') {
-      // Close stale connections
       if (pc && (pc.signalingState === 'closed' || pc.connectionState === 'failed')) {
         pc.close();
         peerConnectionsRef.current.delete(from_user_id);
@@ -342,24 +282,19 @@ export const useVoiceCall = (roomId: string | null) => {
       if (!pc) return;
 
       try {
-        // Handle glare (both sides sending offers simultaneously)
         if (pc.signalingState !== 'stable') {
-          // The peer with the "lower" ID yields
           if (user.id > from_user_id) {
-            console.log('Glare detected, rolling back...');
             await Promise.all([
               pc.setLocalDescription({ type: 'rollback' }),
               pc.setRemoteDescription(new RTCSessionDescription(signal_data.offer))
             ]);
           } else {
-            console.log('Glare detected, ignoring offer...');
             return;
           }
         } else {
           await pc.setRemoteDescription(new RTCSessionDescription(signal_data.offer));
         }
         
-        // Add any pending ICE candidates
         const pendingCandidates = pendingCandidatesRef.current.get(from_user_id) || [];
         for (const candidate of pendingCandidates) {
           await pc.addIceCandidate(candidate);
@@ -376,7 +311,6 @@ export const useVoiceCall = (roomId: string | null) => {
           signal_type: 'answer',
           signal_data: { answer: pc.localDescription?.toJSON() },
         } as any);
-        console.log(`Sent answer to ${from_user_id}`);
       } catch (err) {
         console.error('Error handling offer:', err);
       }
@@ -384,9 +318,7 @@ export const useVoiceCall = (roomId: string | null) => {
       if (pc && pc.signalingState === 'have-local-offer') {
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(signal_data.answer));
-          console.log(`Set remote description (answer) from ${from_user_id}`);
           
-          // Add any pending ICE candidates
           const pendingCandidates = pendingCandidatesRef.current.get(from_user_id) || [];
           for (const candidate of pendingCandidates) {
             await pc.addIceCandidate(candidate);
@@ -401,13 +333,10 @@ export const useVoiceCall = (roomId: string | null) => {
         try {
           if (pc.remoteDescription) {
             await pc.addIceCandidate(new RTCIceCandidate(signal_data.candidate));
-            console.log(`Added ICE candidate from ${from_user_id}`);
           } else {
-            // Queue the candidate for later
             const pending = pendingCandidatesRef.current.get(from_user_id) || [];
             pending.push(new RTCIceCandidate(signal_data.candidate));
             pendingCandidatesRef.current.set(from_user_id, pending);
-            console.log(`Queued ICE candidate from ${from_user_id}`);
           }
         } catch (err) {
           console.error('Error adding ICE candidate:', err);
@@ -424,7 +353,6 @@ export const useVoiceCall = (roomId: string | null) => {
 
     try {
       // Get microphone access
-      console.log('Getting microphone access...');
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -433,14 +361,9 @@ export const useVoiceCall = (roomId: string | null) => {
         }
       });
       localStreamRef.current = stream;
-      console.log('Got local stream:', stream.getTracks().map(t => `${t.kind}:${t.enabled}`).join(', '));
 
-      // Setup local audio analyser for speaking detection
+      // Setup local audio analyser
       setupAudioAnalyser('local', stream);
-
-      // Check if this is the first participant (starting the call)
-      const existingParticipants = await fetchParticipants();
-      const isStartingCall = existingParticipants.length === 0;
 
       // Add participant to database
       const { error } = await supabase.from('voice_call_participants').insert({
@@ -451,7 +374,6 @@ export const useVoiceCall = (roomId: string | null) => {
       } as any);
 
       if (error) {
-        // If already in call, update to active
         if (error.code === '23505') {
           await supabase
             .from('voice_call_participants')
@@ -466,31 +388,18 @@ export const useVoiceCall = (roomId: string | null) => {
       setIsInCall(true);
       setIsMuted(false);
       setCallDuration(0);
-      setCallStartTime(new Date());
 
       // Start duration timer
       timerRef.current = setInterval(() => {
         setCallDuration(prev => prev + 1);
       }, 1000);
 
-      // Send system message
-      const username = profile?.username || 'Alguém';
-      if (isStartingCall) {
-        await sendSystemMessage(roomId, user.id, `📞 ${username} iniciou uma chamada de voz`);
-      } else {
-        await sendSystemMessage(roomId, user.id, `📞 ${username} entrou na chamada`);
-      }
-
-      // Fetch updated participants
-      const updatedParticipants = await fetchParticipants();
-
-      // Create connections to existing participants (excluding self)
-      // Small delay to ensure database is updated
+      // Fetch updated participants and connect
       await new Promise(resolve => setTimeout(resolve, 500));
+      const updatedParticipants = await fetchParticipants();
       
       for (const participant of updatedParticipants) {
         if (participant.user_id !== user.id) {
-          console.log(`Creating connection to existing participant: ${participant.username}`);
           await createPeerConnection(participant.user_id, true);
         }
       }
@@ -510,30 +419,20 @@ export const useVoiceCall = (roomId: string | null) => {
       isJoiningRef.current = false;
       return false;
     }
-  }, [user, profile, roomId, fetchParticipants, createPeerConnection, setupAudioAnalyser]);
+  }, [user, roomId, fetchParticipants, createPeerConnection, setupAudioAnalyser]);
 
   // Leave call
   const leaveCall = useCallback(async () => {
     if (!user || !roomId) return;
 
-    const username = profile?.username || 'Alguém';
-
-    // Check how many participants will remain
-    const remainingParticipants = participants.filter(p => p.user_id !== user.id);
-    const wasLastPerson = remainingParticipants.length === 0;
-
     // Stop local stream
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => {
-        track.stop();
-      });
+      localStreamRef.current.getTracks().forEach(track => track.stop());
       localStreamRef.current = null;
     }
 
     // Close all peer connections
-    peerConnectionsRef.current.forEach(({ connection }) => {
-      connection.close();
-    });
+    peerConnectionsRef.current.forEach(({ connection }) => connection.close());
     peerConnectionsRef.current.clear();
 
     // Stop audio elements
@@ -542,8 +441,6 @@ export const useVoiceCall = (roomId: string | null) => {
       audio.srcObject = null;
     });
     audioElementsRef.current.clear();
-
-    // Clear analysers
     analyserNodesRef.current.clear();
     pendingCandidatesRef.current.clear();
 
@@ -561,22 +458,12 @@ export const useVoiceCall = (roomId: string | null) => {
       .or(`from_user_id.eq.${user.id},to_user_id.eq.${user.id}`)
       .eq('room_id', roomId);
 
-    // Send system message
-    if (wasLastPerson && callStartTime) {
-      const durationMinutes = Math.round((new Date().getTime() - callStartTime.getTime()) / 60000);
-      const durationText = durationMinutes < 1 ? 'menos de 1 minuto' : `${durationMinutes} minuto${durationMinutes !== 1 ? 's' : ''}`;
-      await sendSystemMessage(roomId, user.id, `📞 ${username} saiu da chamada. A chamada durou ${durationText}`);
-    } else {
-      await sendSystemMessage(roomId, user.id, `📞 ${username} saiu da chamada`);
-    }
-
     // Stop timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
 
-    // Stop speaking interval
     if (speakingIntervalRef.current) {
       clearInterval(speakingIntervalRef.current);
       speakingIntervalRef.current = null;
@@ -584,13 +471,10 @@ export const useVoiceCall = (roomId: string | null) => {
 
     setIsInCall(false);
     setCallDuration(0);
-    setCallStartTime(null);
-    
-    // Update active call info
     await fetchParticipants();
     
     toast.info('Você saiu da chamada');
-  }, [user, profile, roomId, participants, callStartTime, fetchParticipants]);
+  }, [user, roomId, fetchParticipants]);
 
   // Toggle mute
   const toggleMute = useCallback(async () => {
@@ -615,7 +499,6 @@ export const useVoiceCall = (roomId: string | null) => {
   useEffect(() => {
     if (!roomId || !user || !isInCall) return;
 
-    // Subscribe to participant changes
     channelRef.current = supabase
       .channel(`voice_participants_${roomId}`)
       .on(
@@ -629,20 +512,16 @@ export const useVoiceCall = (roomId: string | null) => {
         async (payload) => {
           await fetchParticipants();
           
-          // Handle new participant joining
           if (payload.eventType === 'INSERT' || 
               (payload.eventType === 'UPDATE' && (payload.new as any).is_active && !(payload.old as any)?.is_active)) {
             const newUserId = (payload.new as any).user_id;
             if (newUserId !== user.id && localStreamRef.current) {
-              console.log(`New participant joined: ${newUserId}`);
-              // Delay to ensure both sides are ready
               setTimeout(async () => {
                 await createPeerConnection(newUserId, true);
               }, 1000);
             }
           }
           
-          // Handle participant leaving
           if (payload.eventType === 'UPDATE' && !(payload.new as any).is_active) {
             const peerId = (payload.new as any).user_id;
             const peerConn = peerConnectionsRef.current.get(peerId);
@@ -662,7 +541,6 @@ export const useVoiceCall = (roomId: string | null) => {
       )
       .subscribe();
 
-    // Subscribe to signaling
     signalChannelRef.current = supabase
       .channel(`voice_signals_${roomId}_${user.id}`)
       .on(
@@ -688,18 +566,12 @@ export const useVoiceCall = (roomId: string | null) => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      if (speakingIntervalRef.current) {
-        clearInterval(speakingIntervalRef.current);
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (speakingIntervalRef.current) clearInterval(speakingIntervalRef.current);
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
       }
-      peerConnectionsRef.current.forEach(({ connection }) => {
-        connection.close();
-      });
+      peerConnectionsRef.current.forEach(({ connection }) => connection.close());
       audioElementsRef.current.forEach(audio => {
         audio.pause();
         audio.srcObject = null;
@@ -707,12 +579,17 @@ export const useVoiceCall = (roomId: string | null) => {
     };
   }, []);
 
+  // Check if call is active (any participants)
+  const hasActiveCall = participants.length > 0;
+  const callStarterName = participants[0]?.username;
+
   return {
     isInCall,
     isMuted,
     participants,
     callDuration,
-    activeCallInfo,
+    hasActiveCall,
+    callStarterName,
     joinCall,
     leaveCall,
     toggleMute,
