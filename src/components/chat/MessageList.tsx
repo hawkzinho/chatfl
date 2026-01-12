@@ -2,6 +2,9 @@ import { useEffect, useRef } from "react";
 import { Message } from "@/types/chat";
 import { MessageItem } from "./MessageItem";
 import { TypingIndicator } from "./TypingIndicator";
+import { SystemMessage } from "./SystemMessage";
+
+const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 interface MessageListProps {
   messages: Message[];
@@ -139,29 +142,40 @@ export function MessageList({
         </div>
       ) : (
         <div className="py-4">
-          {messages.map((message, index) => (
-            <div key={message.id}>
-              {shouldShowDateSeparator(index) && (
-                <div className="flex items-center gap-4 px-4 py-3">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {formatDate(message.createdAt)}
-                  </span>
-                  <div className="flex-1 h-px bg-border" />
-                </div>
-              )}
-              <MessageItem
-                message={message}
-                isOwn={message.senderId === currentUserId}
-                showAvatar={shouldShowAvatar(index)}
-                currentUserId={currentUserId}
-                onReply={onReply}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onReact={onReact}
-              />
-            </div>
-          ))}
+          {messages.map((message, index) => {
+            const isSystemMessage = message.senderId === SYSTEM_USER_ID;
+            
+            return (
+              <div key={message.id}>
+                {shouldShowDateSeparator(index) && (
+                  <div className="flex items-center gap-4 px-4 py-3">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {formatDate(message.createdAt)}
+                    </span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                )}
+                {isSystemMessage ? (
+                  <SystemMessage 
+                    content={message.content} 
+                    timestamp={message.createdAt} 
+                  />
+                ) : (
+                  <MessageItem
+                    message={message}
+                    isOwn={message.senderId === currentUserId}
+                    showAvatar={shouldShowAvatar(index)}
+                    currentUserId={currentUserId}
+                    onReply={onReply}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onReact={onReact}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       

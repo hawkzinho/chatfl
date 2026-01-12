@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useRooms } from '@/hooks/useRooms';
@@ -7,6 +7,7 @@ import { useFriendships } from '@/hooks/useFriendships';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { useRoomInvites } from '@/hooks/useRoomInvites';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useMicrophonePermission } from '@/hooks/useMicrophonePermission';
 import { Sidebar } from '@/components/chat/Sidebar';
 import { ChatView } from '@/components/chat/ChatView';
 import { Loader2 } from 'lucide-react';
@@ -21,12 +22,37 @@ const Index = () => {
   
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [voiceCallPanelOpen, setVoiceCallPanelOpen] = useState(false);
   
   const { messages, loading: messagesLoading, sendMessage, editMessage, deleteMessage, addReaction, removeReaction } = useMessages(activeRoomId);
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(activeRoomId);
   
   // Initialize notifications (sound and browser notifications)
   useNotifications(activeRoomId);
+  
+  // Request microphone permission on site load
+  const { requestPermission: requestMicPermission, permissionState } = useMicrophonePermission();
+  
+  useEffect(() => {
+    // Request microphone permission if not already granted
+    if (permissionState === 'prompt' || permissionState === 'unknown') {
+      requestMicPermission();
+    }
+  }, [permissionState, requestMicPermission]);
+
+  // Listen for voice call join events from notifications
+  useEffect(() => {
+    const handleJoinVoiceCall = (event: CustomEvent<{ roomId: string }>) => {
+      const { roomId } = event.detail;
+      setActiveRoomId(roomId);
+      setVoiceCallPanelOpen(true);
+    };
+
+    window.addEventListener('join-voice-call', handleJoinVoiceCall as EventListener);
+    return () => {
+      window.removeEventListener('join-voice-call', handleJoinVoiceCall as EventListener);
+    };
+  }, []);
 
   // Redirect to auth if not logged in
   useEffect(() => {
