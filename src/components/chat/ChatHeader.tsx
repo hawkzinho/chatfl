@@ -2,6 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "./UserAvatar";
 import { RoomEditorDialog } from "./RoomEditorDialog";
+import { VoiceCallDialog } from "./VoiceCallDialog";
 import { 
   Hash,
   Users,
@@ -11,7 +12,8 @@ import {
   LogOut,
   Trash2,
   Link,
-  Share2
+  Share2,
+  Phone
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -66,8 +68,7 @@ export function ChatHeader({
   onRegenerateCode,
 }: ChatHeaderProps) {
   const [editorOpen, setEditorOpen] = useState(false);
-  const isDirectMessage = room.type === 'direct';
-  const otherUser = isDirectMessage ? room.members.find(m => m.id !== currentUserId) || room.members[0] : null;
+  const [callDialogOpen, setCallDialogOpen] = useState(false);
   const onlineMembers = room.members.filter(m => m.status === 'online').length;
 
   const getInviteLink = () => {
@@ -104,22 +105,18 @@ export function ChatHeader({
     }
   };
 
+  const handleStartCall = () => {
+    setCallDialogOpen(true);
+    toast.info('Chamada de voz iniciada!');
+  };
+
   return (
     <>
       <div className="h-14 px-4 flex items-center justify-between border-b border-border bg-card">
         <div className="flex items-center gap-3 min-w-0">
-          {isDirectMessage && otherUser ? (
-            <UserAvatar
-              src={otherUser.avatar}
-              username={otherUser.username}
-              status={otherUser.status}
-              size="sm"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center">
-              <Hash className="w-4 h-4 text-muted-foreground" />
-            </div>
-          )}
+          <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center">
+            <Hash className="w-4 h-4 text-muted-foreground" />
+          </div>
           
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -141,23 +138,26 @@ export function ChatHeader({
                 </Tooltip>
               )}
             </div>
-            {isDirectMessage && otherUser ? (
-              <p className={cn(
-                "text-xs capitalize",
-                otherUser.status === 'online' ? 'text-green-600' : 'text-muted-foreground'
-              )}>
-                {otherUser.status === 'online' ? 'Online' : 'Offline'}
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                {room.description || `${room.members.length} membros • ${onlineMembers} online`}
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {room.description || `${room.members.length} membros • ${onlineMembers} online`}
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-1">
-          {!isDirectMessage && room.inviteCode && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button 
+                onClick={handleStartCall}
+                className="p-2 rounded-md hover:bg-muted transition-colors"
+              >
+                <Phone className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Iniciar chamada de voz</TooltipContent>
+          </Tooltip>
+
+          {room.inviteCode && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button 
@@ -170,16 +170,15 @@ export function ChatHeader({
               <TooltipContent>Copiar link de convite</TooltipContent>
             </Tooltip>
           )}
-          {!isDirectMessage && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button className="p-2 rounded-md hover:bg-muted transition-colors">
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{room.members.length} membros</TooltipContent>
-            </Tooltip>
-          )}
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button className="p-2 rounded-md hover:bg-muted transition-colors">
+                <Users className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{room.members.length} membros</TooltipContent>
+          </Tooltip>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -201,40 +200,36 @@ export function ChatHeader({
                 </>
               )}
               
-              {!isDirectMessage && (
-                <>
-                  <DropdownMenuItem onClick={() => setEditorOpen(true)}>
-                    <Settings className="w-4 h-4 mr-2" />
-                    Configurações do Canal
-                  </DropdownMenuItem>
-                  
-                  <DropdownMenuSeparator />
-                  
-                  {isOwner ? (
-                    <DropdownMenuItem 
-                      onClick={handleDelete}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Excluir Canal
-                    </DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem 
-                      onClick={handleLeave}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Sair do Canal
-                    </DropdownMenuItem>
-                  )}
-                </>
+              <DropdownMenuItem onClick={() => setEditorOpen(true)}>
+                <Settings className="w-4 h-4 mr-2" />
+                Configurações do Canal
+              </DropdownMenuItem>
+              
+              <DropdownMenuSeparator />
+              
+              {isOwner ? (
+                <DropdownMenuItem 
+                  onClick={handleDelete}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Excluir Canal
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem 
+                  onClick={handleLeave}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sair do Canal
+                </DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
-      {!isDirectMessage && onUpdateRoom && onDeleteRoom && (
+      {onUpdateRoom && onDeleteRoom && (
         <RoomEditorDialog
           open={editorOpen}
           onOpenChange={setEditorOpen}
@@ -250,6 +245,15 @@ export function ChatHeader({
           isOwner={isOwner}
         />
       )}
+
+      <VoiceCallDialog
+        open={callDialogOpen}
+        onOpenChange={setCallDialogOpen}
+        roomName={room.name}
+        members={room.members}
+        currentUserId={currentUserId}
+        onEndCall={() => toast.info('Chamada encerrada')}
+      />
     </>
   );
 }
