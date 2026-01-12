@@ -10,6 +10,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { Sidebar } from '@/components/chat/Sidebar';
 import { ChatView } from '@/components/chat/ChatView';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -77,9 +78,6 @@ const Index = () => {
   };
 
   // DM functionality removed - groups only app
-  const handleStartDM = async (_friendId: string) => {
-    toast.info('Este app suporta apenas grupos');
-  };
 
   const handleJoinByCode = async (code: string) => {
     const roomId = await joinByCode(code);
@@ -165,32 +163,7 @@ const Index = () => {
     createdAt: new Date(r.created_at),
   }));
 
-  // Transform DMs for sidebar
-  const directMessages = rooms.filter(r => r.type === 'direct').map(r => {
-    const otherMember = r.members?.find(m => m.id !== user.id);
-    return {
-      id: r.id,
-      name: otherMember?.username || 'Desconhecido',
-      type: 'direct' as const,
-      avatar: otherMember?.avatar_url || undefined,
-      members: r.members?.map(m => ({
-        id: m.id,
-        username: m.username,
-        avatar: m.avatar_url || undefined,
-        status: m.status as 'online' | 'offline' | 'away' | 'busy',
-      })) || [],
-      lastMessage: r.last_message ? {
-        id: 'last',
-        content: r.last_message.content,
-        senderId: '',
-        sender: { id: '', username: r.last_message.sender_username, status: 'online' as const },
-        roomId: r.id,
-        createdAt: new Date(r.last_message.created_at),
-      } : undefined,
-      unreadCount: 0,
-      createdAt: new Date(r.created_at),
-    };
-  });
+  // DM transformation removed - groups only app
 
   // Transform messages for chat
   const chatMessages = messages.map(m => ({
@@ -269,7 +242,6 @@ const Index = () => {
     <div className="h-screen bg-background flex overflow-hidden">
       <Sidebar
         rooms={sidebarRooms}
-        directMessages={[]}
         currentUser={currentUser}
         activeRoomId={activeRoomId || ''}
         onSelectRoom={handleSelectRoom}
@@ -290,12 +262,7 @@ const Index = () => {
         onAcceptFriendRequest={acceptFriendRequest}
         onRejectFriendRequest={rejectFriendRequest}
         onRemoveFriend={removeFriend}
-        onStartDM={handleStartDM}
         onJoinByCode={handleJoinByCode}
-        onDeleteRoom={handleDeleteRoom}
-        onLeaveRoom={handleLeaveRoom}
-        onUpdateRoom={updateRoom}
-        onRegenerateCode={regenerateInviteCode}
         onAcceptRoomInvite={acceptInvite}
         onRejectRoomInvite={rejectInvite}
         onRoomInviteAccepted={handleInviteAccepted}
