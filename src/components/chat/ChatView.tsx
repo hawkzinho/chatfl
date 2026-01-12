@@ -1,8 +1,11 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
+import { ActiveCallBanner } from "./ActiveCallBanner";
+import { VoiceCallScreen } from "./VoiceCallScreen";
 import { MessageSquare, Hash, Loader2 } from "lucide-react";
+import { useVoiceCall } from "@/hooks/useVoiceCall";
 
 interface User {
   id: string;
@@ -96,12 +99,37 @@ export function ChatView({
   friends = [],
   onInviteFriend,
 }: ChatViewProps) {
+  const [isJoiningCall, setIsJoiningCall] = useState(false);
+  
+  // Use voice call hook for the active room
+  const {
+    isInCall,
+    isMuted,
+    participants,
+    callDuration,
+    hasActiveCall,
+    callStarterName,
+    joinCall,
+    leaveCall,
+    toggleMute,
+  } = useVoiceCall(room?.id || null);
+
   const handleSend = useCallback(
     (content: string, attachments?: File[]) => {
       onSendMessage(content, attachments);
     },
     [onSendMessage]
   );
+
+  const handleJoinCall = async () => {
+    setIsJoiningCall(true);
+    await joinCall();
+    setIsJoiningCall(false);
+  };
+
+  const handleLeaveCall = async () => {
+    await leaveCall();
+  };
 
   if (!room) {
     return (
@@ -126,6 +154,21 @@ export function ChatView({
 
   const isOwner = room.createdBy === currentUserId;
 
+  // Show full-screen call interface when in call
+  if (isInCall) {
+    return (
+      <VoiceCallScreen
+        roomName={room.name}
+        participants={participants}
+        currentUserId={currentUserId}
+        callDuration={callDuration}
+        isMuted={isMuted}
+        onToggleMute={toggleMute}
+        onLeave={handleLeaveCall}
+      />
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col bg-background h-full overflow-hidden">
       <ChatHeader 
@@ -137,6 +180,16 @@ export function ChatView({
         onUpdateRoom={onUpdateRoom}
         onRegenerateCode={onRegenerateCode}
       />
+
+      {/* Active call banner - only show for groups, not in call, and when there's an active call */}
+      {room.type !== 'direct' && hasActiveCall && !isInCall && (
+        <ActiveCallBanner
+          participants={participants}
+          starterName={callStarterName}
+          onJoin={handleJoinCall}
+          isJoining={isJoiningCall}
+        />
+      )}
       
       <div className="flex-1 overflow-hidden">
         {isLoading ? (

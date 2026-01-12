@@ -39,7 +39,8 @@ export function VoiceCallPanel({
     isMuted,
     participants,
     callDuration,
-    activeCallInfo,
+    hasActiveCall,
+    callStarterName,
     joinCall,
     leaveCall,
     toggleMute,
@@ -85,7 +86,7 @@ export function VoiceCallPanel({
             </h3>
             <p className="text-xs text-muted-foreground">#{roomName}</p>
           </div>
-          {(isInCall || activeCallInfo.hasActiveCall) && (
+          {(isInCall || hasActiveCall) && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Users className="w-3 h-3" />
               <span>{participants.length}</span>
@@ -187,8 +188,8 @@ export function VoiceCallPanel({
                 <Phone className="w-6 h-6" />
               </Button>
               <p className="text-xs text-muted-foreground text-center max-w-[200px]">
-                {activeCallInfo.hasActiveCall 
-                  ? `${activeCallInfo.participantCount} pessoa${activeCallInfo.participantCount !== 1 ? 's' : ''} na chamada iniciada por ${activeCallInfo.starterName}. Clique para entrar.`
+                {hasActiveCall 
+                  ? `${participants.length} pessoa${participants.length !== 1 ? 's' : ''} na chamada iniciada por ${callStarterName}. Clique para entrar.`
                   : 'Clique para iniciar uma chamada de voz'
                 }
               </p>
