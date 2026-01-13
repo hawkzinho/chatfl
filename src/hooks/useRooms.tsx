@@ -257,12 +257,19 @@ export const useRooms = () => {
     toast.success('Room deleted');
   };
 
-  const updateRoom = async (roomId: string, name: string, description: string) => {
+  const updateRoom = async (roomId: string, name: string, description: string, avatarUrl?: string) => {
     if (!user) return;
+
+    const updateData: any = { name, description };
+    
+    // Only update avatar_url if explicitly provided (not undefined)
+    if (avatarUrl !== undefined) {
+      updateData.avatar_url = avatarUrl;
+    }
 
     const { error } = await supabase
       .from('chat_rooms')
-      .update({ name, description })
+      .update(updateData)
       .eq('id', roomId)
       .eq('created_by', user.id);
 

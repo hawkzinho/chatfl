@@ -60,6 +60,7 @@ interface ChatViewProps {
   room: ChatRoom | null;
   messages: Message[];
   currentUserId: string;
+  currentUsername?: string;
   typingUsers?: string[];
   onSendMessage: (content: string, files?: File[]) => void;
   onReply?: (message: Message) => void;
@@ -72,7 +73,7 @@ interface ChatViewProps {
   isLoading?: boolean;
   onDeleteRoom?: (roomId: string) => Promise<void>;
   onLeaveRoom?: (roomId: string) => Promise<void>;
-  onUpdateRoom?: (roomId: string, name: string, description: string) => Promise<void>;
+  onUpdateRoom?: (roomId: string, name: string, description: string, avatarUrl?: string) => Promise<void>;
   onRegenerateCode?: (roomId: string) => Promise<void>;
   friends?: Friend[];
   onInviteFriend?: (friendId: string) => void;
@@ -82,6 +83,7 @@ export function ChatView({
   room,
   messages,
   currentUserId,
+  currentUsername,
   typingUsers = [],
   onSendMessage,
   onReply,
@@ -236,6 +238,7 @@ export function ChatView({
           <MessageList
             messages={messages as any}
             currentUserId={currentUserId}
+            currentUsername={currentUsername}
             typingUsers={typingUsers}
             onReply={onReply as any}
             onEdit={onEditMessage ? (msg: any) => {

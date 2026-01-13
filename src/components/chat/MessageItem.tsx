@@ -4,7 +4,7 @@ import { Message } from "@/types/chat";
 import { UserAvatar } from "./UserAvatar";
 import { MessageReactions } from "./MessageReactions";
 import { LinkText } from "./LinkText";
-import { MentionText } from "./MentionText";
+import { MentionText, extractMentions } from "./MentionText";
 import { AudioPlayer } from "./AudioPlayer";
 import {
   MoreHorizontal, 
@@ -32,6 +32,7 @@ interface MessageItemProps {
   isOwn: boolean;
   showAvatar?: boolean;
   currentUserId: string;
+  currentUsername?: string;
   onReply?: (message: Message) => void;
   onEdit?: (message: Message) => void;
   onDelete?: (message: Message) => void;
@@ -100,6 +101,7 @@ export function MessageItem({
   isOwn,
   showAvatar = true,
   currentUserId,
+  currentUsername,
   onReply,
   onEdit,
   onDelete,
@@ -111,12 +113,19 @@ export function MessageItem({
     onReact?.(message.id, emoji);
   };
 
+  // Check if current user is mentioned in this message
+  const isMentioned = currentUsername 
+    ? extractMentions(message.content).includes(currentUsername.toLowerCase())
+    : false;
+
   return (
     <div
       className={cn(
         'group flex gap-3 px-4 py-1.5 transition-colors',
         'hover:bg-muted/30',
-        isOwn && 'flex-row-reverse'
+        isOwn && 'flex-row-reverse',
+        // Highlight when user is mentioned (Discord-style)
+        isMentioned && !isOwn && 'bg-primary/10 border-l-2 border-primary hover:bg-primary/15'
       )}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}

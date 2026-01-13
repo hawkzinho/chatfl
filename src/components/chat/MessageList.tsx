@@ -16,6 +16,7 @@ const getSystemMessageContent = (content: string) => content.replace(SYSTEM_MESS
 interface MessageListProps {
   messages: Message[];
   currentUserId: string;
+  currentUsername?: string;
   typingUsers: string[];
   onReply?: (message: Message) => void;
   onEdit?: (message: Message) => void;
@@ -55,6 +56,7 @@ const formatDate = (date: Date): string => {
 export function MessageList({
   messages,
   currentUserId,
+  currentUsername,
   typingUsers,
   onReply,
   onEdit,
@@ -174,6 +176,7 @@ export function MessageList({
                     isOwn={message.senderId === currentUserId}
                     showAvatar={shouldShowAvatar(index)}
                     currentUserId={currentUserId}
+                    currentUsername={currentUsername}
                     onReply={onReply}
                     onEdit={onEdit}
                     onDelete={onDelete}
