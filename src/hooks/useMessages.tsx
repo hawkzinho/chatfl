@@ -43,15 +43,7 @@ export const useMessages = (roomId: string | null) => {
       .from('messages')
       .select(`
         *,
-        profiles!messages_sender_id_fkey (id, username, avatar_url, status),
-        reply_to:messages!messages_reply_to_id_fkey (
-          id,
-          content,
-          sender_id,
-          room_id,
-          created_at,
-          sender:profiles!messages_sender_id_fkey (id, username, avatar_url, status)
-        )
+        profiles!messages_sender_id_fkey (id, username, avatar_url, status)
       `)
       .eq('room_id', roomId)
       .order('created_at', { ascending: true });
@@ -61,6 +53,12 @@ export const useMessages = (roomId: string | null) => {
       setLoading(false);
       return;
     }
+
+    // Build a map of messages by ID for reply lookups
+    const messagesById: Record<string, any> = {};
+    data.forEach(m => {
+      messagesById[m.id] = m;
+    });
 
     // Fetch reactions for all messages
     const messageIds = data.map(m => m.id);
@@ -82,8 +80,8 @@ export const useMessages = (roomId: string | null) => {
     });
 
     const messagesWithReactions: Message[] = data.map(m => {
-      // reply_to comes as an array from Supabase FK join, get first element
-      const replyToData = Array.isArray(m.reply_to) ? m.reply_to[0] : m.reply_to;
+      // Look up replied message from our local map
+      const replyToData = m.reply_to_id ? messagesById[m.reply_to_id] : null;
       
       return {
         ...m,
@@ -97,7 +95,7 @@ export const useMessages = (roomId: string | null) => {
           is_edited: false,
           created_at: replyToData.created_at,
           updated_at: replyToData.created_at,
-          sender: replyToData.sender as MessageProfile,
+          sender: replyToData.profiles as MessageProfile,
           reactions: [],
         } : undefined,
         reactions: reactionsByMessage[m.id] 
