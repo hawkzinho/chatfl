@@ -62,22 +62,25 @@ export const useMessages = (roomId: string | null) => {
 
     // Fetch reactions for all messages
     const messageIds = data.map(m => m.id);
-    const { data: reactions } = await supabase
-      .from('message_reactions')
-      .select('message_id, emoji, user_id')
-      .in('message_id', messageIds);
+    let reactionsByMessage: Record<string, Record<string, string[]>> = {};
+    
+    if (messageIds.length > 0) {
+      const { data: reactions } = await supabase
+        .from('message_reactions')
+        .select('message_id, emoji, user_id')
+        .in('message_id', messageIds);
 
-    // Group reactions by message and emoji
-    const reactionsByMessage: Record<string, Record<string, string[]>> = {};
-    reactions?.forEach(r => {
-      if (!reactionsByMessage[r.message_id]) {
-        reactionsByMessage[r.message_id] = {};
-      }
-      if (!reactionsByMessage[r.message_id][r.emoji]) {
-        reactionsByMessage[r.message_id][r.emoji] = [];
-      }
-      reactionsByMessage[r.message_id][r.emoji].push(r.user_id);
-    });
+      // Group reactions by message and emoji
+      reactions?.forEach(r => {
+        if (!reactionsByMessage[r.message_id]) {
+          reactionsByMessage[r.message_id] = {};
+        }
+        if (!reactionsByMessage[r.message_id][r.emoji]) {
+          reactionsByMessage[r.message_id][r.emoji] = [];
+        }
+        reactionsByMessage[r.message_id][r.emoji].push(r.user_id);
+      });
+    }
 
     const messagesWithReactions: Message[] = data.map(m => {
       // Look up replied message from our local map
@@ -128,7 +131,7 @@ export const useMessages = (roomId: string | null) => {
         },
         async (payload) => {
           if (payload.eventType === 'INSERT') {
-            // Fetch the complete message with sender info
+            // Fetch the complete message with sender info and reply_to
             const { data } = await supabase
               .from('messages')
               .select(`
@@ -139,9 +142,37 @@ export const useMessages = (roomId: string | null) => {
               .single();
 
             if (data) {
+              // Fetch reply_to message if exists
+              let replyToData = null;
+              if (data.reply_to_id) {
+                const { data: replyMsg } = await supabase
+                  .from('messages')
+                  .select(`
+                    *,
+                    profiles!messages_sender_id_fkey (id, username, avatar_url, status)
+                  `)
+                  .eq('id', data.reply_to_id)
+                  .single();
+                if (replyMsg) {
+                  replyToData = {
+                    id: replyMsg.id,
+                    room_id: replyMsg.room_id,
+                    sender_id: replyMsg.sender_id,
+                    content: replyMsg.content,
+                    reply_to_id: null,
+                    is_edited: false,
+                    created_at: replyMsg.created_at,
+                    updated_at: replyMsg.created_at,
+                    sender: replyMsg.profiles as MessageProfile,
+                    reactions: [],
+                  };
+                }
+              }
+              
               const newMessage: Message = {
                 ...data,
                 sender: data.profiles as MessageProfile,
+                reply_to: replyToData || undefined,
                 reactions: [],
               };
               setMessages(prev => [...prev, newMessage]);
