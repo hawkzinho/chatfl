@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "./UserAvatar";
+import { ScreenShareViewer } from "./ScreenShareViewer";
 import { 
   Phone, 
   PhoneOff, 
@@ -40,6 +41,7 @@ export function VoiceCallPanel({
     isInCall,
     isMuted,
     isScreenSharing,
+    remoteScreenShares,
     participants,
     callDuration,
     hasActiveCall,
@@ -151,6 +153,13 @@ export function VoiceCallPanel({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Screen Share Viewer */}
+        {isInCall && remoteScreenShares.length > 0 && (
+          <div className="mb-4">
+            <ScreenShareViewer screenShares={remoteScreenShares} />
           </div>
         )}
 

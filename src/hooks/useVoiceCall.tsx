@@ -12,6 +12,13 @@ export interface Participant {
   is_muted: boolean;
   is_active: boolean;
   isSpeaking?: boolean;
+  isScreenSharing?: boolean;
+}
+
+export interface ScreenShareInfo {
+  peerId: string;
+  username: string;
+  videoElement: HTMLVideoElement;
 }
 
 interface PeerConnection {
@@ -51,6 +58,7 @@ export const useVoiceCall = (roomId: string | null) => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [callDuration, setCallDuration] = useState(0);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [remoteScreenShares, setRemoteScreenShares] = useState<ScreenShareInfo[]>([]);
   
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -294,6 +302,39 @@ export const useVoiceCall = (roomId: string | null) => {
           videoElementsRef.current.set(peerId, videoEl);
         }
         videoEl.srcObject = remoteStream;
+        
+        // Find participant username for display
+        const participant = participants.find(p => p.user_id === peerId);
+        const username = participant?.username || 'Desconhecido';
+        
+        // Add to remote screen shares state
+        setRemoteScreenShares(prev => {
+          // Remove existing if any
+          const filtered = prev.filter(s => s.peerId !== peerId);
+          return [...filtered, { peerId, username, videoElement: videoEl! }];
+        });
+        
+        // Handle track ended
+        event.track.onended = () => {
+          console.log(`Screen share track ended from ${peerId}`);
+          setRemoteScreenShares(prev => prev.filter(s => s.peerId !== peerId));
+          videoElementsRef.current.delete(peerId);
+        };
+        
+        event.track.onmute = () => {
+          console.log(`Screen share track muted from ${peerId}`);
+          setRemoteScreenShares(prev => prev.filter(s => s.peerId !== peerId));
+        };
+        
+        event.track.onunmute = () => {
+          console.log(`Screen share track unmuted from ${peerId}`);
+          const participant = participants.find(p => p.user_id === peerId);
+          const username = participant?.username || 'Desconhecido';
+          setRemoteScreenShares(prev => {
+            const filtered = prev.filter(s => s.peerId !== peerId);
+            return [...filtered, { peerId, username, videoElement: videoEl! }];
+          });
+        };
       }
     };
 
@@ -571,12 +612,13 @@ export const useVoiceCall = (roomId: string | null) => {
     });
     audioElementsRef.current.clear();
     
-    // Stop video elements
+    // Stop video elements and clear remote screen shares
     videoElementsRef.current.forEach(video => {
       video.pause();
       video.srcObject = null;
     });
     videoElementsRef.current.clear();
+    setRemoteScreenShares([]);
     
     analyserNodesRef.current.clear();
     pendingCandidatesRef.current.clear();
@@ -819,6 +861,7 @@ export const useVoiceCall = (roomId: string | null) => {
     isInCall,
     isMuted,
     isScreenSharing,
+    remoteScreenShares,
     participants,
     callDuration,
     hasActiveCall,

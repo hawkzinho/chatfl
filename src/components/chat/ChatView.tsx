@@ -105,6 +105,8 @@ export function ChatView({
   const {
     isInCall,
     isMuted,
+    isScreenSharing,
+    remoteScreenShares,
     participants,
     callDuration,
     hasActiveCall,
@@ -112,6 +114,8 @@ export function ChatView({
     joinCall,
     leaveCall,
     toggleMute,
+    startScreenShare,
+    stopScreenShare,
   } = useVoiceCall(room?.id || null);
 
   const handleSend = useCallback(
@@ -129,6 +133,14 @@ export function ChatView({
 
   const handleLeaveCall = async () => {
     await leaveCall();
+  };
+
+  const handleToggleScreenShare = async () => {
+    if (isScreenSharing) {
+      await stopScreenShare();
+    } else {
+      await startScreenShare();
+    }
   };
 
   if (!room) {
@@ -163,7 +175,10 @@ export function ChatView({
         currentUserId={currentUserId}
         callDuration={callDuration}
         isMuted={isMuted}
+        isScreenSharing={isScreenSharing}
+        remoteScreenShares={remoteScreenShares}
         onToggleMute={toggleMute}
+        onToggleScreenShare={handleToggleScreenShare}
         onLeave={handleLeaveCall}
       />
     );
