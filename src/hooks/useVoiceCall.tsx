@@ -69,15 +69,24 @@ export const useVoiceCall = (roomId: string | null) => {
       return [];
     }
 
-    const formattedParticipants: Participant[] = (data || []).map((p: any) => ({
-      id: p.id,
-      user_id: p.user_id,
-      username: p.profiles?.username || 'Desconhecido',
-      avatar_url: p.profiles?.avatar_url,
-      is_muted: p.is_muted,
-      is_active: p.is_active,
-      isSpeaking: false,
-    }));
+    // Dedupe participants by user_id to avoid showing same user multiple times
+    const seenUserIds = new Set<string>();
+    const formattedParticipants: Participant[] = [];
+    
+    for (const p of (data || [])) {
+      if (!seenUserIds.has(p.user_id)) {
+        seenUserIds.add(p.user_id);
+        formattedParticipants.push({
+          id: p.id,
+          user_id: p.user_id,
+          username: p.profiles?.username || 'Desconhecido',
+          avatar_url: p.profiles?.avatar_url,
+          is_muted: p.is_muted,
+          is_active: p.is_active,
+          isSpeaking: false,
+        });
+      }
+    }
 
     setParticipants(formattedParticipants);
     return formattedParticipants;
