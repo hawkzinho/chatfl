@@ -43,7 +43,15 @@ export const useMessages = (roomId: string | null) => {
       .from('messages')
       .select(`
         *,
-        profiles!messages_sender_id_fkey (id, username, avatar_url, status)
+        profiles!messages_sender_id_fkey (id, username, avatar_url, status),
+        reply_to:messages!messages_reply_to_id_fkey (
+          id,
+          content,
+          sender_id,
+          room_id,
+          created_at,
+          sender:profiles!messages_sender_id_fkey (id, username, avatar_url, status)
+        )
       `)
       .eq('room_id', roomId)
       .order('created_at', { ascending: true });
@@ -73,13 +81,30 @@ export const useMessages = (roomId: string | null) => {
       reactionsByMessage[r.message_id][r.emoji].push(r.user_id);
     });
 
-    const messagesWithReactions: Message[] = data.map(m => ({
-      ...m,
-      sender: m.profiles as MessageProfile,
-      reactions: reactionsByMessage[m.id] 
-        ? Object.entries(reactionsByMessage[m.id]).map(([emoji, users]) => ({ emoji, users }))
-        : [],
-    }));
+    const messagesWithReactions: Message[] = data.map(m => {
+      // reply_to comes as an array from Supabase FK join, get first element
+      const replyToData = Array.isArray(m.reply_to) ? m.reply_to[0] : m.reply_to;
+      
+      return {
+        ...m,
+        sender: m.profiles as MessageProfile,
+        reply_to: replyToData ? {
+          id: replyToData.id,
+          room_id: replyToData.room_id,
+          sender_id: replyToData.sender_id,
+          content: replyToData.content,
+          reply_to_id: null,
+          is_edited: false,
+          created_at: replyToData.created_at,
+          updated_at: replyToData.created_at,
+          sender: replyToData.sender as MessageProfile,
+          reactions: [],
+        } : undefined,
+        reactions: reactionsByMessage[m.id] 
+          ? Object.entries(reactionsByMessage[m.id]).map(([emoji, users]) => ({ emoji, users }))
+          : [],
+      };
+    });
 
     setMessages(messagesWithReactions);
     setLoading(false);
