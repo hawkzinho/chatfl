@@ -205,11 +205,15 @@ const Index = () => {
       id: m.reply_to.id,
       content: m.reply_to.content,
       senderId: m.reply_to.sender_id,
-      sender: {
+      sender: m.reply_to.sender ? {
         id: m.reply_to.sender.id,
         username: m.reply_to.sender.username,
         avatar: m.reply_to.sender.avatar_url || undefined,
-        status: m.reply_to.sender.status as 'online' | 'offline' | 'away' | 'busy',
+        status: (m.reply_to.sender.status || 'offline') as 'online' | 'offline' | 'away' | 'busy',
+      } : {
+        id: m.reply_to.sender_id,
+        username: 'Unknown',
+        status: 'offline' as const,
       },
       roomId: m.reply_to.room_id,
       createdAt: new Date(m.reply_to.created_at),

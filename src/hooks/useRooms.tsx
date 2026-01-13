@@ -115,6 +115,31 @@ export const useRooms = () => {
     fetchRooms();
   }, [user]);
 
+  // Subscribe to room_members changes for realtime join/leave updates
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('room_members_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'room_members',
+        },
+        () => {
+          // Refetch rooms when membership changes
+          fetchRooms();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const createRoom = async (name: string, description?: string, type: string = 'public') => {
     if (!user) return null;
 
