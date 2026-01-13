@@ -17,14 +17,31 @@ export interface Participant {
 interface PeerConnection {
   peerId: string;
   connection: RTCPeerConnection;
+  isConnected: boolean;
+  connectionAttempts: number;
 }
 
+// More robust ICE servers including free TURN servers for better connectivity
 const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    // Free TURN servers for better NAT traversal
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
   ],
+  iceCandidatePoolSize: 10,
 };
 
 export const useVoiceCall = (roomId: string | null) => {
@@ -33,18 +50,23 @@ export const useVoiceCall = (roomId: string | null) => {
   const [isMuted, setIsMuted] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [callDuration, setCallDuration] = useState(0);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   
   const localStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, PeerConnection>>(new Map());
   const channelRef = useRef<RealtimeChannel | null>(null);
   const signalChannelRef = useRef<RealtimeChannel | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const videoElementsRef = useRef<Map<string, HTMLVideoElement>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserNodesRef = useRef<Map<string, { analyser: AnalyserNode; dataArray: Uint8Array<ArrayBuffer> }>>(new Map());
   const speakingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isJoiningRef = useRef(false);
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidate[]>>(new Map());
+  const processedSignalsRef = useRef<Set<string>>(new Set());
+  const connectionRetryTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Fetch current participants
   const fetchParticipants = useCallback(async () => {
@@ -164,6 +186,28 @@ export const useVoiceCall = (roomId: string | null) => {
     };
   }, [isInCall, isMuted, user]);
 
+  // Retry connection with exponential backoff
+  const retryConnection = useCallback((peerId: string, attempt: number = 1) => {
+    if (attempt > 3) {
+      console.log(`Max retry attempts reached for ${peerId}`);
+      return;
+    }
+    
+    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+    console.log(`Scheduling retry ${attempt} for ${peerId} in ${delay}ms`);
+    
+    const timeout = setTimeout(async () => {
+      const peerConn = peerConnectionsRef.current.get(peerId);
+      if (!peerConn || peerConn.connection.connectionState === 'failed' || 
+          peerConn.connection.connectionState === 'disconnected') {
+        peerConnectionsRef.current.delete(peerId);
+        await createPeerConnection(peerId, true);
+      }
+    }, delay);
+    
+    connectionRetryTimeoutsRef.current.set(peerId, timeout);
+  }, []);
+
   // Create peer connection for a user
   const createPeerConnection = useCallback(async (peerId: string, initiator: boolean) => {
     if (!user || !roomId) return null;
@@ -171,9 +215,8 @@ export const useVoiceCall = (roomId: string | null) => {
     // Check if connection already exists and is healthy
     const existingConn = peerConnectionsRef.current.get(peerId);
     if (existingConn && 
-        existingConn.connection.connectionState !== 'failed' && 
-        existingConn.connection.connectionState !== 'closed' &&
-        existingConn.connection.connectionState !== 'disconnected') {
+        existingConn.isConnected &&
+        existingConn.connection.connectionState === 'connected') {
       return existingConn.connection;
     }
 
@@ -183,8 +226,23 @@ export const useVoiceCall = (roomId: string | null) => {
       peerConnectionsRef.current.delete(peerId);
     }
 
+    // Clear any pending retry
+    const pendingRetry = connectionRetryTimeoutsRef.current.get(peerId);
+    if (pendingRetry) {
+      clearTimeout(pendingRetry);
+      connectionRetryTimeoutsRef.current.delete(peerId);
+    }
+
     console.log(`Creating peer connection with ${peerId}, initiator: ${initiator}`);
     const pc = new RTCPeerConnection(ICE_SERVERS);
+    
+    const peerConnData: PeerConnection = { 
+      peerId, 
+      connection: pc, 
+      isConnected: false,
+      connectionAttempts: (existingConn?.connectionAttempts || 0) + 1
+    };
+    peerConnectionsRef.current.set(peerId, peerConnData);
     
     // Add local stream tracks
     if (localStreamRef.current) {
@@ -193,11 +251,19 @@ export const useVoiceCall = (roomId: string | null) => {
       });
     }
 
-    // Handle incoming audio
+    // Add screen share tracks if active
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => {
+        pc.addTrack(track, screenStreamRef.current!);
+      });
+    }
+
+    // Handle incoming tracks (audio and video)
     pc.ontrack = (event) => {
-      console.log(`Received remote track from ${peerId}`);
+      console.log(`Received remote track from ${peerId}, kind: ${event.track.kind}`);
       const [remoteStream] = event.streams;
-      if (remoteStream && event.track.kind === 'audio') {
+      
+      if (event.track.kind === 'audio') {
         let audioEl = audioElementsRef.current.get(peerId);
         if (!audioEl) {
           audioEl = new Audio();
@@ -217,40 +283,80 @@ export const useVoiceCall = (roomId: string | null) => {
         });
         
         setupAudioAnalyser(peerId, remoteStream);
+      } else if (event.track.kind === 'video') {
+        // Handle incoming screen share
+        let videoEl = videoElementsRef.current.get(peerId);
+        if (!videoEl) {
+          videoEl = document.createElement('video');
+          videoEl.autoplay = true;
+          videoEl.playsInline = true;
+          videoEl.muted = true;
+          videoElementsRef.current.set(peerId, videoEl);
+        }
+        videoEl.srcObject = remoteStream;
       }
     };
 
-    // Handle ICE candidates
+    // Handle ICE candidates - batch them for better performance
+    let iceCandidateBuffer: RTCIceCandidate[] = [];
+    let iceSendTimeout: NodeJS.Timeout | null = null;
+    
     pc.onicecandidate = async (event) => {
       if (event.candidate) {
-        await supabase.from('voice_call_signals').insert({
-          room_id: roomId,
-          from_user_id: user.id,
-          to_user_id: peerId,
-          signal_type: 'ice-candidate',
-          signal_data: { candidate: event.candidate.toJSON() },
-        } as any);
+        iceCandidateBuffer.push(event.candidate);
+        
+        // Debounce sending ICE candidates
+        if (iceSendTimeout) clearTimeout(iceSendTimeout);
+        iceSendTimeout = setTimeout(async () => {
+          const candidates = [...iceCandidateBuffer];
+          iceCandidateBuffer = [];
+          
+          for (const candidate of candidates) {
+            await supabase.from('voice_call_signals').insert({
+              room_id: roomId,
+              from_user_id: user.id,
+              to_user_id: peerId,
+              signal_type: 'ice-candidate',
+              signal_data: { candidate: candidate.toJSON() },
+            } as any);
+          }
+        }, 100);
       }
     };
 
     pc.oniceconnectionstatechange = () => {
+      console.log(`ICE state for ${peerId}: ${pc.iceConnectionState}`);
       if (pc.iceConnectionState === 'failed') {
+        console.log(`ICE failed for ${peerId}, restarting...`);
         pc.restartIce();
+      } else if (pc.iceConnectionState === 'disconnected') {
+        // Schedule retry
+        retryConnection(peerId, peerConnData.connectionAttempts);
       }
     };
 
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'connected') {
-        console.log(`Connected with ${peerId}`);
+      console.log(`Connection state for ${peerId}: ${pc.connectionState}`);
+      const peerData = peerConnectionsRef.current.get(peerId);
+      if (peerData) {
+        if (pc.connectionState === 'connected') {
+          peerData.isConnected = true;
+          peerData.connectionAttempts = 0;
+          console.log(`✓ Connected with ${peerId}`);
+        } else if (pc.connectionState === 'failed') {
+          peerData.isConnected = false;
+          retryConnection(peerId, peerData.connectionAttempts);
+        }
       }
     };
-
-    peerConnectionsRef.current.set(peerId, { peerId, connection: pc });
 
     // If initiator, create and send offer
     if (initiator) {
       try {
-        const offer = await pc.createOffer({ offerToReceiveAudio: true });
+        const offer = await pc.createOffer({ 
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: true 
+        });
         await pc.setLocalDescription(offer);
         
         await supabase.from('voice_call_signals').insert({
@@ -266,7 +372,7 @@ export const useVoiceCall = (roomId: string | null) => {
     }
 
     return pc;
-  }, [user, roomId, setupAudioAnalyser]);
+  }, [user, roomId, setupAudioAnalyser, retryConnection]);
 
   // Handle incoming signal
   const handleSignal = useCallback(async (signal: any) => {
@@ -403,14 +509,17 @@ export const useVoiceCall = (roomId: string | null) => {
         setCallDuration(prev => prev + 1);
       }, 1000);
 
-      // Fetch updated participants and connect
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Fetch updated participants and connect with staggered timing for multi-party calls
+      await new Promise(resolve => setTimeout(resolve, 300));
       const updatedParticipants = await fetchParticipants();
       
-      for (const participant of updatedParticipants) {
-        if (participant.user_id !== user.id) {
-          await createPeerConnection(participant.user_id, true);
-        }
+      // Connect to each participant with small delay to avoid overwhelming signaling
+      const otherParticipants = updatedParticipants.filter(p => p.user_id !== user.id);
+      for (let i = 0; i < otherParticipants.length; i++) {
+        const participant = otherParticipants[i];
+        // Stagger connections by 200ms each for better reliability with 3+ participants
+        await new Promise(resolve => setTimeout(resolve, i * 200));
+        await createPeerConnection(participant.user_id, true);
       }
 
       toast.success('Você entrou na chamada');
@@ -440,9 +549,20 @@ export const useVoiceCall = (roomId: string | null) => {
       localStreamRef.current = null;
     }
 
+    // Stop screen share if active
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current = null;
+    }
+    setIsScreenSharing(false);
+
     // Close all peer connections
     peerConnectionsRef.current.forEach(({ connection }) => connection.close());
     peerConnectionsRef.current.clear();
+
+    // Clear retry timeouts
+    connectionRetryTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+    connectionRetryTimeoutsRef.current.clear();
 
     // Stop audio elements
     audioElementsRef.current.forEach(audio => {
@@ -450,8 +570,17 @@ export const useVoiceCall = (roomId: string | null) => {
       audio.srcObject = null;
     });
     audioElementsRef.current.clear();
+    
+    // Stop video elements
+    videoElementsRef.current.forEach(video => {
+      video.pause();
+      video.srcObject = null;
+    });
+    videoElementsRef.current.clear();
+    
     analyserNodesRef.current.clear();
     pendingCandidatesRef.current.clear();
+    processedSignalsRef.current.clear();
 
     // Update database
     await supabase
@@ -503,6 +632,95 @@ export const useVoiceCall = (roomId: string | null) => {
     setIsMuted(newMuted);
     toast.info(newMuted ? 'Microfone desativado' : 'Microfone ativado');
   }, [isMuted, user, roomId]);
+
+  // Start screen sharing
+  const startScreenShare = useCallback(async () => {
+    if (!user || !roomId || !isInCall) return false;
+
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { cursor: 'always' } as any,
+        audio: false,
+      });
+      
+      screenStreamRef.current = stream;
+      setIsScreenSharing(true);
+
+      // Add screen track to all existing peer connections
+      const videoTrack = stream.getVideoTracks()[0];
+      
+      peerConnectionsRef.current.forEach(async ({ connection, peerId }) => {
+        const sender = connection.addTrack(videoTrack, stream);
+        
+        // Renegotiate connection
+        try {
+          const offer = await connection.createOffer();
+          await connection.setLocalDescription(offer);
+          
+          await supabase.from('voice_call_signals').insert({
+            room_id: roomId,
+            from_user_id: user.id,
+            to_user_id: peerId,
+            signal_type: 'offer',
+            signal_data: { offer: connection.localDescription?.toJSON() },
+          } as any);
+        } catch (err) {
+          console.error('Error renegotiating for screen share:', err);
+        }
+      });
+
+      // Handle track ended (user clicked "Stop sharing")
+      videoTrack.onended = () => {
+        stopScreenShare();
+      };
+
+      toast.success('Compartilhamento de tela iniciado');
+      return true;
+    } catch (err: any) {
+      if (err.name !== 'NotAllowedError') {
+        console.error('Error starting screen share:', err);
+        toast.error('Não foi possível compartilhar a tela');
+      }
+      return false;
+    }
+  }, [user, roomId, isInCall]);
+
+  // Stop screen sharing
+  const stopScreenShare = useCallback(async () => {
+    if (!screenStreamRef.current) return;
+
+    // Stop the screen stream
+    screenStreamRef.current.getTracks().forEach(track => track.stop());
+    screenStreamRef.current = null;
+    setIsScreenSharing(false);
+
+    // Remove video tracks from all peer connections and renegotiate
+    peerConnectionsRef.current.forEach(async ({ connection, peerId }) => {
+      const senders = connection.getSenders();
+      const videoSender = senders.find(s => s.track?.kind === 'video');
+      if (videoSender) {
+        connection.removeTrack(videoSender);
+        
+        // Renegotiate
+        try {
+          const offer = await connection.createOffer();
+          await connection.setLocalDescription(offer);
+          
+          await supabase.from('voice_call_signals').insert({
+            room_id: roomId,
+            from_user_id: user!.id,
+            to_user_id: peerId,
+            signal_type: 'offer',
+            signal_data: { offer: connection.localDescription?.toJSON() },
+          } as any);
+        } catch (err) {
+          console.error('Error renegotiating after stopping screen share:', err);
+        }
+      }
+    });
+
+    toast.info('Compartilhamento de tela encerrado');
+  }, [roomId, user]);
 
   // Subscribe to realtime updates
   useEffect(() => {
@@ -592,9 +810,15 @@ export const useVoiceCall = (roomId: string | null) => {
   const hasActiveCall = participants.length > 0;
   const callStarterName = participants[0]?.username;
 
+  // Get remote video elements for screen sharing
+  const getRemoteScreenShare = useCallback((peerId: string) => {
+    return videoElementsRef.current.get(peerId);
+  }, []);
+
   return {
     isInCall,
     isMuted,
+    isScreenSharing,
     participants,
     callDuration,
     hasActiveCall,
@@ -602,6 +826,9 @@ export const useVoiceCall = (roomId: string | null) => {
     joinCall,
     leaveCall,
     toggleMute,
+    startScreenShare,
+    stopScreenShare,
+    getRemoteScreenShare,
     fetchParticipants,
   };
 };

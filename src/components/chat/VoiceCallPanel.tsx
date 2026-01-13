@@ -7,7 +7,9 @@ import {
   Mic, 
   MicOff, 
   Users,
-  Volume2
+  Volume2,
+  Monitor,
+  MonitorOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useVoiceCall, Participant } from "@/hooks/useVoiceCall";
@@ -37,6 +39,7 @@ export function VoiceCallPanel({
   const {
     isInCall,
     isMuted,
+    isScreenSharing,
     participants,
     callDuration,
     hasActiveCall,
@@ -44,6 +47,8 @@ export function VoiceCallPanel({
     joinCall,
     leaveCall,
     toggleMute,
+    startScreenShare,
+    stopScreenShare,
   } = useVoiceCall(roomId);
 
   const [isJoining, setIsJoining] = useState(false);
@@ -204,6 +209,15 @@ export function VoiceCallPanel({
                 title={isMuted ? "Ativar microfone" : "Desativar microfone"}
               >
                 {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </Button>
+              <Button
+                variant={isScreenSharing ? "default" : "outline"}
+                size="lg"
+                className="rounded-full w-12 h-12"
+                onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+                title={isScreenSharing ? "Parar compartilhamento" : "Compartilhar tela"}
+              >
+                {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
               </Button>
               <Button
                 variant="destructive"
