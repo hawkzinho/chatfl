@@ -44,26 +44,54 @@ export function VoiceCallDialog({
   const [callDuration, setCallDuration] = useState(0);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const ringtoneTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Play ringtone for incoming calls - plays ONCE (not looping)
+  // Play ringtone for incoming calls - plays for first 9 seconds only
   useEffect(() => {
     if (open && isIncoming && !callActive) {
+      // Create and play ringtone
       const audio = new Audio(RINGTONE);
-      audio.loop = false; // Play once, not loop
-      audio.volume = 0.6;
+      audio.loop = false; // Don't loop - we handle duration manually
+      audio.volume = 0.7;
       ringtoneRef.current = audio;
       
-      // Handle autoplay restrictions gracefully
-      audio.play().catch((err) => {
-        console.log('Ringtone autoplay blocked:', err.message);
-      });
+      // Try to play - handle autoplay restrictions
+      const playRingtone = () => {
+        audio.play().catch((err) => {
+          console.log('Ringtone autoplay blocked, will play on interaction:', err.message);
+          // Add one-time listener for user interaction
+          const playOnInteraction = () => {
+            audio.play().catch(() => {});
+            document.removeEventListener('click', playOnInteraction);
+            document.removeEventListener('keydown', playOnInteraction);
+          };
+          document.addEventListener('click', playOnInteraction, { once: true });
+          document.addEventListener('keydown', playOnInteraction, { once: true });
+        });
+      };
+      
+      playRingtone();
+      
+      // Stop ringtone after 9 seconds automatically
+      ringtoneTimeoutRef.current = setTimeout(() => {
+        if (ringtoneRef.current) {
+          ringtoneRef.current.pause();
+          ringtoneRef.current.currentTime = 0;
+        }
+      }, 9000);
     }
 
     return () => {
+      // Cleanup ringtone
       if (ringtoneRef.current) {
         ringtoneRef.current.pause();
         ringtoneRef.current.currentTime = 0;
         ringtoneRef.current = null;
+      }
+      // Cleanup timeout
+      if (ringtoneTimeoutRef.current) {
+        clearTimeout(ringtoneTimeoutRef.current);
+        ringtoneTimeoutRef.current = null;
       }
     };
   }, [open, isIncoming, callActive]);
