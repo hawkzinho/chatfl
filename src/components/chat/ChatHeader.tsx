@@ -61,7 +61,7 @@ interface ChatHeaderProps {
   isOwner?: boolean;
   onDeleteRoom?: (roomId: string) => Promise<void>;
   onLeaveRoom?: (roomId: string) => Promise<void>;
-  onUpdateRoom?: (roomId: string, name: string, description: string) => Promise<void>;
+  onUpdateRoom?: (roomId: string, name: string, description: string, avatarUrl?: string) => Promise<void>;
   onRegenerateCode?: (roomId: string) => Promise<void>;
 }
 

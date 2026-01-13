@@ -25,7 +25,7 @@ interface RoomEditorDialogProps {
     inviteCode?: string;
     avatar?: string;
   };
-  onUpdate: (roomId: string, name: string, description: string) => Promise<void>;
+  onUpdate: (roomId: string, name: string, description: string, avatarUrl?: string) => Promise<void>;
   onDelete: (roomId: string) => Promise<void>;
   onRegenerateCode?: (roomId: string) => Promise<void>;
   isOwner: boolean;
@@ -54,7 +54,8 @@ export function RoomEditorDialog({
 
     setLoading(true);
     try {
-      await onUpdate(room.id, name.trim(), description.trim());
+      // Pass avatarUrl to update function so it persists
+      await onUpdate(room.id, name.trim(), description.trim(), avatarUrl || undefined);
       toast.success("Canal atualizado!");
       onOpenChange(false);
     } catch (error) {

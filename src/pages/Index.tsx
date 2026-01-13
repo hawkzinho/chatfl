@@ -287,6 +287,7 @@ const Index = () => {
         room={activeChatRoom}
         messages={chatMessages}
         currentUserId={user.id}
+        currentUsername={profile.username}
         typingUsers={typingUsernames}
         onSendMessage={handleSendMessage}
         onReply={handleReply}
