@@ -45,18 +45,24 @@ export function VoiceCallDialog({
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Play ringtone for incoming calls
+  // Play ringtone for incoming calls - plays ONCE (not looping)
   useEffect(() => {
     if (open && isIncoming && !callActive) {
-      ringtoneRef.current = new Audio(RINGTONE);
-      ringtoneRef.current.loop = true;
-      ringtoneRef.current.volume = 0.6;
-      ringtoneRef.current.play().catch(() => {});
+      const audio = new Audio(RINGTONE);
+      audio.loop = false; // Play once, not loop
+      audio.volume = 0.6;
+      ringtoneRef.current = audio;
+      
+      // Handle autoplay restrictions gracefully
+      audio.play().catch((err) => {
+        console.log('Ringtone autoplay blocked:', err.message);
+      });
     }
 
     return () => {
       if (ringtoneRef.current) {
         ringtoneRef.current.pause();
+        ringtoneRef.current.currentTime = 0;
         ringtoneRef.current = null;
       }
     };

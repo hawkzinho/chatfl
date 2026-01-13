@@ -7,8 +7,53 @@ interface MentionTextProps {
   className?: string;
 }
 
-// Parse text to find @mentions
+// URL regex pattern for link detection
+const URL_REGEX = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+
+// Parse text to find @mentions and links
+export function parseTextContent(text: string): { type: "text" | "mention" | "link"; content: string }[] {
+  if (!text) return [];
+  
+  const parts: { type: "text" | "mention" | "link"; content: string }[] = [];
+  
+  // First split by URLs
+  const urlParts = text.split(URL_REGEX);
+  
+  urlParts.forEach((part) => {
+    if (URL_REGEX.test(part)) {
+      // Reset regex lastIndex
+      URL_REGEX.lastIndex = 0;
+      parts.push({ type: "link", content: part });
+    } else if (part) {
+      // Parse mentions within non-URL parts
+      const mentionRegex = /@(\w+)/g;
+      let lastIndex = 0;
+      let match;
+      
+      while ((match = mentionRegex.exec(part)) !== null) {
+        // Add text before the mention
+        if (match.index > lastIndex) {
+          parts.push({ type: "text", content: part.slice(lastIndex, match.index) });
+        }
+        // Add the mention
+        parts.push({ type: "mention", content: match[1] });
+        lastIndex = match.index + match[0].length;
+      }
+      
+      // Add remaining text
+      if (lastIndex < part.length) {
+        parts.push({ type: "text", content: part.slice(lastIndex) });
+      }
+    }
+  });
+  
+  return parts;
+}
+
+// Legacy function for backward compatibility
 export function parseMentions(text: string): { type: "text" | "mention"; content: string }[] {
+  if (!text) return [];
+  
   const mentionRegex = /@(\w+)/g;
   const parts: { type: "text" | "mention"; content: string }[] = [];
   let lastIndex = 0;
@@ -34,6 +79,8 @@ export function parseMentions(text: string): { type: "text" | "mention"; content
 
 // Extract mentioned usernames from text
 export function extractMentions(text: string): string[] {
+  if (!text) return [];
+  
   const mentionRegex = /@(\w+)/g;
   const mentions: string[] = [];
   let match;
@@ -46,7 +93,12 @@ export function extractMentions(text: string): string[] {
 }
 
 export function MentionText({ text, currentUserId, className }: MentionTextProps) {
-  const parts = parseMentions(text);
+  // Handle empty or undefined text gracefully
+  if (!text) {
+    return <span className={className}></span>;
+  }
+  
+  const parts = parseTextContent(text);
 
   return (
     <span className={className}>
@@ -61,6 +113,15 @@ export function MentionText({ text, currentUserId, className }: MentionTextProps
             >
               @{part.content}
             </span>
+          ) : part.type === "link" ? (
+            <a
+              href={part.content}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline break-all"
+            >
+              {part.content}
+            </a>
           ) : (
             part.content
           )}

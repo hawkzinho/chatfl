@@ -33,6 +33,7 @@ interface RoomListItemProps {
 export function RoomListItem({ room, isActive, onClick }: RoomListItemProps) {
   const isDirectMessage = room.type === 'direct';
   const otherUser = isDirectMessage ? room.members?.[0] : null;
+  const hasAvatar = !!room.avatar;
 
   return (
     <button
@@ -50,6 +51,14 @@ export function RoomListItem({ room, isActive, onClick }: RoomListItemProps) {
           status={otherUser.status}
           size="sm"
         />
+      ) : hasAvatar ? (
+        <div className="w-8 h-8 rounded-lg overflow-hidden">
+          <img 
+            src={room.avatar} 
+            alt={room.name}
+            className="w-full h-full object-cover"
+          />
+        </div>
       ) : (
         <div className={cn(
           "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
