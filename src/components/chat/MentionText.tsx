@@ -93,12 +93,23 @@ export function extractMentions(text: string): string[] {
 }
 
 export function MentionText({ text, currentUserId, className }: MentionTextProps) {
-  // Handle empty or undefined text gracefully
-  if (!text) {
+  // Handle empty or undefined text gracefully - but NEVER return empty for valid strings
+  if (text === null || text === undefined) {
     return <span className={className}></span>;
   }
   
+  // If text is an empty string, just return empty span
+  if (text === '') {
+    return <span className={className}></span>;
+  }
+  
+  // Parse the text content for mentions and links
   const parts = parseTextContent(text);
+  
+  // If parsing returned no parts but we have text, just render the text directly
+  if (parts.length === 0 && text) {
+    return <span className={className}>{text}</span>;
+  }
 
   return (
     <span className={className}>

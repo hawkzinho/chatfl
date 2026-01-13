@@ -9,9 +9,9 @@ const MENTION_SOUND = '/sounds/notification.mp3';
 
 // Track last played time to prevent overlap
 let lastPlayedTime = 0;
-const MIN_PLAY_INTERVAL = 300; // ms
+const MIN_PLAY_INTERVAL = 500; // ms
 
-const playSound = (soundPath: string, volume: number = 0.5) => {
+const playSound = (soundPath: string, volume: number = 0.5): HTMLAudioElement | null => {
   try {
     const now = Date.now();
     // Prevent overlapping sounds
@@ -37,7 +37,7 @@ const showBrowserNotification = (title: string, body: string, onClick?: () => vo
     const notification = new Notification(title, {
       body,
       icon: '/favicon.ico',
-      tag: 'chat-notification-' + Date.now(), // Unique tag to allow multiple notifications
+      tag: 'chat-notification-' + Date.now(),
       requireInteraction: false,
     });
     
@@ -53,7 +53,7 @@ const showBrowserNotification = (title: string, body: string, onClick?: () => vo
   }
 };
 
-// Show in-app toast notification
+// Show in-app toast notification (NO sound - sound handled separately)
 const showInAppNotification = (title: string, body: string) => {
   toast(title, {
     description: body,
@@ -92,12 +92,12 @@ export const useNotifications = (currentRoomId: string | null, currentUsername?:
     }
   }, []);
 
-  // Subscribe to new messages across all rooms (for regular message notifications only)
+  // Subscribe to new messages across all rooms
   useEffect(() => {
     if (!user) return;
 
     const channel = supabase
-      .channel('global-messages')
+      .channel('global-messages-notifications')
       .on(
         'postgres_changes',
         {
@@ -115,7 +115,7 @@ export const useNotifications = (currentRoomId: string | null, currentUsername?:
           if (lastMessageRef.current === newMessage.id) return;
           lastMessageRef.current = newMessage.id;
 
-          // Skip system messages entirely (no notifications for them)
+          // Skip system messages entirely
           if (newMessage.content?.startsWith('🔔 SISTEMA: ')) return;
 
           // Fetch sender info
@@ -133,13 +133,7 @@ export const useNotifications = (currentRoomId: string | null, currentUsername?:
 
           const isActiveRoom = newMessage.room_id === currentRoomId;
           const isDocumentVisible = document.visibilityState === 'visible';
-
-          // Always play notification sound (respects system volume, doesn't overlap)
-          if (wasMentioned) {
-            playSound(MENTION_SOUND, 0.7);
-          } else if (!isActiveRoom || !isDocumentVisible) {
-            playSound(NOTIFICATION_SOUND, 0.5);
-          }
+          const isInsideActiveRoom = isActiveRoom && isDocumentVisible;
 
           // Determine notification content
           const notificationTitle = wasMentioned 
@@ -147,14 +141,30 @@ export const useNotifications = (currentRoomId: string | null, currentUsername?:
             : `Nova mensagem de ${senderName}`;
           const notificationBody = newMessage.content?.substring(0, 50) + (newMessage.content?.length > 50 ? '...' : '') || 'Nova mensagem';
 
-          // Show notification based on page visibility and active room
+          // RULE: If user is INSIDE the site and in active room - NO sound, just toast for mentions
+          // RULE: If user is OUTSIDE the site (different tab, minimized) - browser notification + sound
+          
           if (!isDocumentVisible) {
-            // Page not visible - use browser notification
+            // User is OUTSIDE the site - play sound and show browser notification
+            if (wasMentioned) {
+              playSound(MENTION_SOUND, 0.7);
+            } else {
+              playSound(NOTIFICATION_SOUND, 0.5);
+            }
             showBrowserNotification(notificationTitle, notificationBody);
-          } else if (!isActiveRoom || wasMentioned) {
-            // Page visible but different room or mentioned - show in-app toast
+          } else if (!isActiveRoom) {
+            // User is on site but different room - play sound + in-app toast
+            if (wasMentioned) {
+              playSound(MENTION_SOUND, 0.7);
+            } else {
+              playSound(NOTIFICATION_SOUND, 0.4);
+            }
+            showInAppNotification(notificationTitle, notificationBody);
+          } else if (wasMentioned) {
+            // User is in the active room but was mentioned - just show toast (no sound since they're looking at it)
             showInAppNotification(notificationTitle, notificationBody);
           }
+          // If user is in active room and no mention - no notification at all
         }
       )
       .subscribe();

@@ -116,9 +116,19 @@ export function ChatHeader({
     <>
       <div className="h-14 px-4 flex items-center justify-between border-b border-border bg-card">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center">
-            <Hash className="w-4 h-4 text-muted-foreground" />
-          </div>
+          {room.avatar ? (
+            <div className="w-8 h-8 rounded-md overflow-hidden">
+              <img 
+                src={room.avatar} 
+                alt={room.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center">
+              <Hash className="w-4 h-4 text-muted-foreground" />
+            </div>
+          )}
           
           <div className="min-w-0">
             <div className="flex items-center gap-2">
