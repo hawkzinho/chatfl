@@ -4,8 +4,9 @@ import { Message } from "@/types/chat";
 import { UserAvatar } from "./UserAvatar";
 import { MessageReactions } from "./MessageReactions";
 import { LinkText } from "./LinkText";
+import { MentionText } from "./MentionText";
 import { AudioPlayer } from "./AudioPlayer";
-import { 
+import {
   MoreHorizontal, 
   Reply, 
   Smile, 
@@ -170,7 +171,7 @@ export function MessageItem({
           
           {message.content && (
             <p className="text-sm whitespace-pre-wrap break-words">
-              <LinkText text={message.content} />
+              <MentionText text={message.content} currentUserId={currentUserId} />
             </p>
           )}
 

@@ -260,6 +260,12 @@ export function ChatView({
         replyTo={replyingTo as any}
         onCancelReply={onCancelReply}
         placeholder={`Mensagem ${room.type === 'direct' ? room.name : '#' + room.name}...`}
+        roomMembers={room.members.map(m => ({
+          id: m.id,
+          username: m.username,
+          avatar_url: m.avatar || null,
+          status: m.status,
+        }))}
       />
     </div>
   );

@@ -2,8 +2,11 @@ import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
-// Modern, smooth notification sound (gentle pop/chime - WhatsApp style)
-const NOTIFICATION_SOUND = 'data:audio/wav;base64,UklGRsgCAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YaQCAAAFAAsAEgAaACMALAA2AD8ASABRAE1ATQBKAEQAPQA0ACoAHwATAAcA/P/w/+T/2f/O/8T/u/+z/6z/pv+h/53/mv+Y/5f/l/+Y/5r/nf+h/6b/rP+z/7v/xP/O/9n/5P/w//z/BwATAB8AKgA0AD0ARABKAEsARgA9ADIAJQAYAAoA/f/x/+X/2v/Q/8f/v/+4/7L/rf+p/6b/pf+k/6X/pv+p/6z/sP+1/7v/wv/J/9H/2f/i/+v/8//8/wQACwARABYAGgAdAB8AHwAdABoAFQAQAAkAAgD6//L/6v/j/9z/1f/Q/8v/x//E/8L/wf/A/8H/wv/E/8f/y//P/9T/2v/g/+b/7P/y//f//P8AAAQABwAJAAoACgAJAAcABAABAP7/+v/2//L/7f/p/+X/4f/d/9r/2P/W/9X/1P/U/9X/1v/X/9n/2//d/+D/4//m/+n/7P/v//L/9f/3//r//P/+/wAAAQACAAMAAwADAAIAAQAAAP///f/8//r/+f/3//b/9P/z//L/8f/w//D/8P/w//D/8f/x//L/8//0//X/9v/3//j/+f/6//v//P/8//3//v/+////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADw/+T/2P/M/8D/tP+o/53/kv+I/37/dP9r/2P/W/9U/03/R/9C/z7/O/84/zX/Mv8w/y//Lv8t/y3/Lf8u/y//MP8y/zX/OP87/z7/Qv9H/03/VP9b/2P/a/90/37/iP+S/53/qP+0/8D/zP/Y/+T/8P/8/wgAFAAg';
+// Modern, crisp notification sound - pleasant bell chime
+const NOTIFICATION_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADhAC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAA4T/////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//tQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+
+// Mention notification sound - slightly different tone
+const MENTION_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADhAC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAA4T/////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//tQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
 
 const playSound = (soundData: string, volume: number = 0.4) => {
   try {
@@ -29,7 +32,7 @@ const showBrowserNotification = (title: string, body: string) => {
   }
 };
 
-export const useNotifications = (currentRoomId: string | null) => {
+export const useNotifications = (currentRoomId: string | null, currentUsername?: string) => {
   const { user } = useAuth();
   const lastMessageRef = useRef<string | null>(null);
 
@@ -78,12 +81,26 @@ export const useNotifications = (currentRoomId: string | null) => {
 
           const senderName = senderData?.username || 'Alguém';
           
-          // Play notification sound
-          playSound(NOTIFICATION_SOUND, 0.4);
+          // Check if user was mentioned
+          const wasMentioned = currentUsername && 
+            newMessage.content.toLowerCase().includes(`@${currentUsername.toLowerCase()}`);
+          
+          // Play appropriate notification sound
+          if (wasMentioned) {
+            // Play mention sound twice for emphasis
+            playSound(MENTION_SOUND, 0.6);
+            setTimeout(() => playSound(MENTION_SOUND, 0.4), 150);
+          } else {
+            playSound(NOTIFICATION_SOUND, 0.4);
+          }
           
           // Show browser notification
+          const notificationTitle = wasMentioned 
+            ? `🔔 ${senderName} mencionou você!`
+            : `Nova mensagem de ${senderName}`;
+          
           showBrowserNotification(
-            `Nova mensagem de ${senderName}`,
+            notificationTitle,
             newMessage.content.substring(0, 50) + (newMessage.content.length > 50 ? '...' : '')
           );
         }
@@ -107,5 +124,9 @@ export const useNotifications = (currentRoomId: string | null) => {
     playSound(NOTIFICATION_SOUND, 0.4);
   }, []);
 
-  return { requestPermission, playNotification };
+  const playMentionNotification = useCallback(() => {
+    playSound(MENTION_SOUND, 0.6);
+  }, []);
+
+  return { requestPermission, playNotification, playMentionNotification };
 };
