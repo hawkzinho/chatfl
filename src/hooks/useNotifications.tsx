@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { toast } from 'sonner';
 
 // Use the provided custom notification sound
 const NOTIFICATION_SOUND = '/sounds/notification.mp3';
@@ -31,24 +32,63 @@ const playSound = (soundPath: string, volume: number = 0.5) => {
   }
 };
 
-const showBrowserNotification = (title: string, body: string) => {
-  if (Notification.permission === 'granted') {
-    new Notification(title, {
+const showBrowserNotification = (title: string, body: string, onClick?: () => void) => {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const notification = new Notification(title, {
       body,
       icon: '/favicon.ico',
-      tag: 'chat-notification',
+      tag: 'chat-notification-' + Date.now(), // Unique tag to allow multiple notifications
+      requireInteraction: false,
     });
+    
+    if (onClick) {
+      notification.onclick = () => {
+        window.focus();
+        onClick();
+      };
+    }
+    
+    // Auto-close after 5 seconds
+    setTimeout(() => notification.close(), 5000);
   }
+};
+
+// Show in-app toast notification
+const showInAppNotification = (title: string, body: string) => {
+  toast(title, {
+    description: body,
+    duration: 4000,
+  });
 };
 
 export const useNotifications = (currentRoomId: string | null, currentUsername?: string) => {
   const { user } = useAuth();
   const lastMessageRef = useRef<string | null>(null);
+  const hasInteracted = useRef(false);
+
+  // Track user interaction for autoplay
+  useEffect(() => {
+    const handleInteraction = () => {
+      hasInteracted.current = true;
+    };
+    
+    window.addEventListener('click', handleInteraction, { once: true });
+    window.addEventListener('keydown', handleInteraction, { once: true });
+    
+    return () => {
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
+    };
+  }, []);
 
   // Request notification permission on mount
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+      // Delay permission request slightly
+      const timer = setTimeout(() => {
+        Notification.requestPermission();
+      }, 3000);
+      return () => clearTimeout(timer);
     }
   }, []);
 
@@ -76,10 +116,7 @@ export const useNotifications = (currentRoomId: string | null, currentUsername?:
           lastMessageRef.current = newMessage.id;
 
           // Skip system messages entirely (no notifications for them)
-          if (newMessage.content.startsWith('🔔 SISTEMA: ')) return;
-          
-          // Don't notify for messages in current active room (unless tab is hidden)
-          if (newMessage.room_id === currentRoomId && document.visibilityState === 'visible') return;
+          if (newMessage.content?.startsWith('🔔 SISTEMA: ')) return;
 
           // Fetch sender info
           const { data: senderData } = await supabase
@@ -91,25 +128,33 @@ export const useNotifications = (currentRoomId: string | null, currentUsername?:
           const senderName = senderData?.username || 'Alguém';
           
           // Check if user was mentioned
-          const wasMentioned = currentUsername && 
+          const wasMentioned = currentUsername && newMessage.content &&
             newMessage.content.toLowerCase().includes(`@${currentUsername.toLowerCase()}`);
-          
-          // Play notification sound (single play, respects system volume)
+
+          const isActiveRoom = newMessage.room_id === currentRoomId;
+          const isDocumentVisible = document.visibilityState === 'visible';
+
+          // Always play notification sound (respects system volume, doesn't overlap)
           if (wasMentioned) {
             playSound(MENTION_SOUND, 0.7);
-          } else {
+          } else if (!isActiveRoom || !isDocumentVisible) {
             playSound(NOTIFICATION_SOUND, 0.5);
           }
-          
-          // Show browser notification
+
+          // Determine notification content
           const notificationTitle = wasMentioned 
             ? `🔔 ${senderName} mencionou você!`
             : `Nova mensagem de ${senderName}`;
-          
-          showBrowserNotification(
-            notificationTitle,
-            newMessage.content.substring(0, 50) + (newMessage.content.length > 50 ? '...' : '')
-          );
+          const notificationBody = newMessage.content?.substring(0, 50) + (newMessage.content?.length > 50 ? '...' : '') || 'Nova mensagem';
+
+          // Show notification based on page visibility and active room
+          if (!isDocumentVisible) {
+            // Page not visible - use browser notification
+            showBrowserNotification(notificationTitle, notificationBody);
+          } else if (!isActiveRoom || wasMentioned) {
+            // Page visible but different room or mentioned - show in-app toast
+            showInAppNotification(notificationTitle, notificationBody);
+          }
         }
       )
       .subscribe();
@@ -117,7 +162,7 @@ export const useNotifications = (currentRoomId: string | null, currentUsername?:
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, currentRoomId]);
+  }, [user, currentRoomId, currentUsername]);
 
   const requestPermission = useCallback(async () => {
     if ('Notification' in window) {
