@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
 import { Message } from "@/types/chat";
 import { VoiceRecorder } from "./VoiceRecorder";
+import { MentionDropdown } from "./MentionDropdown";
+import { useMentions } from "@/hooks/useMentions";
 import { 
   Send, 
   Paperclip, 
@@ -23,6 +25,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+interface User {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  status?: string;
+}
+
 interface MessageInputProps {
   onSend: (content: string, attachments?: File[]) => void;
   onTyping?: () => void;
@@ -30,6 +39,7 @@ interface MessageInputProps {
   onCancelReply?: () => void;
   disabled?: boolean;
   placeholder?: string;
+  roomMembers?: User[];
 }
 
 const quickEmojis = ['😀', '😂', '❤️', '👍', '🎉', '🔥', '👀', '💯', '✨', '🙌'];
@@ -41,11 +51,24 @@ export function MessageInput({
   onCancelReply,
   disabled = false,
   placeholder = 'Digite uma mensagem...',
+  roomMembers = [],
 }: MessageInputProps) {
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleMentionSelect = (user: User) => {
+    const newContent = mentions.selectMention(user, content);
+    setContent(newContent);
+    textareaRef.current?.focus();
+  };
+
+  const mentions = useMentions({
+    users: roomMembers,
+    onMentionSelect: handleMentionSelect,
+  });
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -59,9 +82,15 @@ export function MessageInput({
     onSend(content.trim(), attachments.length > 0 ? attachments : undefined);
     setContent('');
     setAttachments([]);
+    mentions.closeMentions();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Let mentions handle navigation keys first
+    if (mentions.handleKeyDown(e)) {
+      return;
+    }
+    
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -86,12 +115,15 @@ export function MessageInput({
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setContent(e.target.value);
+    const value = e.target.value;
+    const cursorPosition = e.target.selectionStart || 0;
+    
+    setContent(value);
+    mentions.handleInputChange(value, cursorPosition);
     onTyping?.();
   };
 
   const handleVoiceRecording = (blob: Blob) => {
-    // Get the correct extension based on mime type
     const mimeType = blob.type || 'audio/webm';
     let extension = 'webm';
     if (mimeType.includes('ogg')) extension = 'ogg';
@@ -104,7 +136,16 @@ export function MessageInput({
   };
 
   return (
-    <div className="p-4 border-t border-border bg-card">
+    <div ref={containerRef} className="p-4 border-t border-border bg-card relative">
+      {/* Mention Dropdown */}
+      <MentionDropdown
+        users={mentions.filteredUsers}
+        selectedIndex={mentions.selectedIndex}
+        onSelect={handleMentionSelect}
+        position={{ top: 60, left: 16 }}
+        isVisible={mentions.showMentions}
+      />
+
       {/* Reply Preview */}
       {replyTo && (
         <div className="flex items-center gap-3 mb-3 p-3 rounded-lg bg-muted/50 border border-border">
@@ -181,7 +222,7 @@ export function MessageInput({
               </TooltipTrigger>
               <TooltipContent>Anexar arquivo</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="start">
+            <DropdownMenuContent align="start" className="bg-popover">
               <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
                 <ImageIcon className="w-4 h-4 mr-2" />
                 Foto ou Vídeo
@@ -236,7 +277,7 @@ export function MessageInput({
               </TooltipTrigger>
               <TooltipContent>Emoji</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="end" className="grid grid-cols-5 gap-1 p-3">
+            <DropdownMenuContent align="end" className="grid grid-cols-5 gap-1 p-3 bg-popover">
               {quickEmojis.map((emoji) => (
                 <button
                   key={emoji}
@@ -269,6 +310,13 @@ export function MessageInput({
           <TooltipContent>Enviar mensagem</TooltipContent>
         </Tooltip>
       </div>
+
+      {/* Hint for mentions */}
+      {roomMembers.length > 0 && (
+        <p className="text-xs text-muted-foreground mt-2 opacity-60">
+          💡 Digite @ para mencionar alguém
+        </p>
+      )}
     </div>
   );
 }

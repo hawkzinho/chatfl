@@ -27,7 +27,7 @@ const Index = () => {
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(activeRoomId);
   
   // Initialize notifications (sound and browser notifications for regular messages only)
-  useNotifications(activeRoomId);
+  useNotifications(activeRoomId, profile?.username);
   
   // Request microphone permission on site load
   const { requestPermission: requestMicPermission, permissionState } = useMicrophonePermission();
