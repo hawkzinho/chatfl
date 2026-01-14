@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useRef } from 'react';
 
 interface VoiceCallState {
   isInCall: boolean;
@@ -14,6 +14,11 @@ interface VoiceCallContextValue extends VoiceCallState {
   minimizeCall: () => void;
   expandCall: () => void;
   endCall: () => void;
+  // Refs to hold the actual call functions from useVoiceCall hook
+  callFunctionsRef: React.MutableRefObject<{
+    toggleMute?: () => void;
+    leaveCall?: () => Promise<void>;
+  }>;
 }
 
 const VoiceCallContext = createContext<VoiceCallContextValue | null>(null);
@@ -27,6 +32,12 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
     isMuted: false,
     callDuration: 0,
   });
+
+  // Store references to the actual call control functions
+  const callFunctionsRef = useRef<{
+    toggleMute?: () => void;
+    leaveCall?: () => Promise<void>;
+  }>({});
 
   const setCallState = useCallback((newState: Partial<VoiceCallState>) => {
     setState(prev => ({ ...prev, ...newState }));
@@ -52,7 +63,14 @@ export function VoiceCallProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <VoiceCallContext.Provider value={{ ...state, setCallState, minimizeCall, expandCall, endCall }}>
+    <VoiceCallContext.Provider value={{ 
+      ...state, 
+      setCallState, 
+      minimizeCall, 
+      expandCall, 
+      endCall,
+      callFunctionsRef
+    }}>
       {children}
     </VoiceCallContext.Provider>
   );

@@ -5,6 +5,7 @@ interface MentionTextProps {
   text: string;
   currentUserId?: string;
   className?: string;
+  isOwnMessage?: boolean; // For contrast on sender bubble
 }
 
 // URL regex pattern for link detection
@@ -92,7 +93,7 @@ export function extractMentions(text: string): string[] {
   return mentions;
 }
 
-export function MentionText({ text, currentUserId, className }: MentionTextProps) {
+export function MentionText({ text, currentUserId, className, isOwnMessage = false }: MentionTextProps) {
   // Handle empty or undefined text gracefully - but NEVER return empty for valid strings
   if (text === null || text === undefined) {
     return <span className={className}></span>;
@@ -119,7 +120,9 @@ export function MentionText({ text, currentUserId, className }: MentionTextProps
             <span
               className={cn(
                 "px-1 py-0.5 rounded font-medium",
-                "bg-primary/20 text-primary"
+                isOwnMessage 
+                  ? "bg-white/20 text-white" // High contrast on dark sender bubble
+                  : "bg-primary/20 text-primary"
               )}
             >
               @{part.content}
@@ -129,7 +132,12 @@ export function MentionText({ text, currentUserId, className }: MentionTextProps
               href={part.content}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary hover:underline break-all"
+              className={cn(
+                "hover:underline break-all",
+                isOwnMessage 
+                  ? "text-sky-200 hover:text-sky-100" // Light blue for contrast on dark bubble
+                  : "text-primary"
+              )}
             >
               {part.content}
             </a>

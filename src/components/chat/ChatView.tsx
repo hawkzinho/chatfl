@@ -6,6 +6,7 @@ import { ActiveCallBanner } from "./ActiveCallBanner";
 import { VoiceCallScreen } from "./VoiceCallScreen";
 import { MessageSquare, Hash, Loader2 } from "lucide-react";
 import { useVoiceCall } from "@/hooks/useVoiceCall";
+import { useVoiceCallContext } from "@/contexts/VoiceCallContext";
 
 interface User {
   id: string;
@@ -102,6 +103,7 @@ export function ChatView({
   onInviteFriend,
 }: ChatViewProps) {
   const [isJoiningCall, setIsJoiningCall] = useState(false);
+  const voiceCallContext = useVoiceCallContext();
   
   // Use voice call hook for the active room
   const {
@@ -119,6 +121,9 @@ export function ChatView({
     startScreenShare,
     stopScreenShare,
   } = useVoiceCall(room?.id || null);
+
+  // Check if currently in this room's call (not minimized)
+  const showCallScreen = isInCall && !voiceCallContext.isMinimized;
 
   const handleSend = useCallback(
     (content: string, attachments?: File[]) => {
@@ -168,8 +173,8 @@ export function ChatView({
 
   const isOwner = room.createdBy === currentUserId;
 
-  // Show full-screen call interface when in call
-  if (isInCall) {
+  // Show full-screen call interface when in call and not minimized
+  if (showCallScreen) {
     return (
       <VoiceCallScreen
         roomName={room.name}

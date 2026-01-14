@@ -180,7 +180,7 @@ export function MessageItem({
           
           {message.content && (
             <p className="text-sm whitespace-pre-wrap break-words">
-              <MentionText text={message.content} currentUserId={currentUserId} />
+              <MentionText text={message.content} currentUserId={currentUserId} isOwnMessage={isOwn} />
             </p>
           )}
 

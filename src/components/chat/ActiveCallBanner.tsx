@@ -1,6 +1,9 @@
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Phone, Users } from "lucide-react";
 import { UserAvatar } from "./UserAvatar";
+
+const RINGTONE_PATH = '/sounds/ringtone.mp3';
 
 interface Participant {
   id: string;
@@ -22,6 +25,74 @@ export function ActiveCallBanner({
   onJoin,
   isJoining,
 }: ActiveCallBannerProps) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasPlayedRef = useRef(false);
+
+  // Play ringtone when banner appears (incoming call detected)
+  useEffect(() => {
+    if (participants.length === 0) return;
+    
+    // Only play once per call
+    if (hasPlayedRef.current) return;
+    hasPlayedRef.current = true;
+
+    const audio = new Audio(RINGTONE_PATH);
+    audio.loop = false;
+    audio.volume = 0.6;
+    audioRef.current = audio;
+
+    // Try to play ringtone
+    const playRingtone = () => {
+      audio.play().catch((err) => {
+        console.log('Ringtone autoplay blocked:', err.message);
+        // Wait for user interaction
+        const handleInteraction = () => {
+          audio.play().catch(() => {});
+          document.removeEventListener('click', handleInteraction);
+          document.removeEventListener('keydown', handleInteraction);
+        };
+        document.addEventListener('click', handleInteraction, { once: true });
+        document.addEventListener('keydown', handleInteraction, { once: true });
+      });
+    };
+
+    playRingtone();
+
+    // Stop ringtone after 9 seconds
+    timeoutRef.current = setTimeout(() => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+    }, 9000);
+
+    return () => {
+      // Cleanup on unmount (user joined or left the room)
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [participants.length]);
+
+  // Stop ringtone when joining
+  const handleJoin = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    onJoin();
+  };
+
   if (participants.length === 0) return null;
 
   return (
@@ -60,7 +131,7 @@ export function ActiveCallBanner({
       <Button
         size="sm"
         className="bg-green-600 hover:bg-green-700 text-white"
-        onClick={onJoin}
+        onClick={handleJoin}
         disabled={isJoining}
       >
         <Phone className="w-4 h-4 mr-1" />

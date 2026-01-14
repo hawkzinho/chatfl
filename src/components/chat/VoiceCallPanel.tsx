@@ -58,7 +58,15 @@ export function VoiceCallPanel({
   const voiceCallContext = useVoiceCallContext();
   const [isJoining, setIsJoining] = useState(false);
 
-  // Sync with global context
+  // Store call function references in context for global minimized bar
+  useEffect(() => {
+    voiceCallContext.callFunctionsRef.current = {
+      toggleMute,
+      leaveCall,
+    };
+  }, [toggleMute, leaveCall]);
+
+  // Sync with global context - update state when call state changes
   useEffect(() => {
     voiceCallContext.setCallState({
       isInCall,
@@ -92,8 +100,10 @@ export function VoiceCallPanel({
     onClose?.();
   };
 
+  // Minimize: ONLY hide UI, do NOT stop the call
   const handleMinimize = () => {
     voiceCallContext.minimizeCall();
+    // Close the panel UI but keep the call active
     onClose?.();
   };
 
