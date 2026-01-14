@@ -26,6 +26,7 @@ interface PeerConnection {
   connection: RTCPeerConnection;
   isConnected: boolean;
   connectionAttempts: number;
+  lastAudioCheck?: number;
 }
 
 // More robust ICE servers including free TURN servers for better connectivity
@@ -51,6 +52,11 @@ const ICE_SERVERS: RTCConfiguration = {
   iceCandidatePoolSize: 10,
 };
 
+// Audio health check interval (ms)
+const AUDIO_HEALTH_CHECK_INTERVAL = 5000;
+// Maximum time without audio activity before attempting reconnection (ms)
+const AUDIO_STALE_THRESHOLD = 15000;
+
 export const useVoiceCall = (roomId: string | null) => {
   const { user, profile } = useAuth();
   const [isInCall, setIsInCall] = useState(false);
@@ -75,6 +81,9 @@ export const useVoiceCall = (roomId: string | null) => {
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidate[]>>(new Map());
   const processedSignalsRef = useRef<Set<string>>(new Set());
   const connectionRetryTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const audioHealthCheckRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAudioActivityRef = useRef<Map<string, number>>(new Map());
+  const streamReadyRef = useRef(false);
 
   // Fetch current participants
   const fetchParticipants = useCallback(async () => {
@@ -220,16 +229,33 @@ export const useVoiceCall = (roomId: string | null) => {
   const createPeerConnection = useCallback(async (peerId: string, initiator: boolean) => {
     if (!user || !roomId) return null;
     
+    // Wait for stream to be ready if we're the initiator
+    if (initiator && !streamReadyRef.current) {
+      console.log(`Waiting for stream to be ready before connecting to ${peerId}`);
+      // Wait up to 2 seconds for stream to be ready
+      let waitTime = 0;
+      while (!streamReadyRef.current && waitTime < 2000) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        waitTime += 100;
+      }
+      if (!streamReadyRef.current) {
+        console.error(`Stream not ready after waiting, aborting connection to ${peerId}`);
+        return null;
+      }
+    }
+    
     // Check if connection already exists and is healthy
     const existingConn = peerConnectionsRef.current.get(peerId);
     if (existingConn && 
         existingConn.isConnected &&
         existingConn.connection.connectionState === 'connected') {
+      console.log(`Reusing existing healthy connection to ${peerId}`);
       return existingConn.connection;
     }
 
     // Close old connection if exists
     if (existingConn) {
+      console.log(`Closing stale connection to ${peerId}`);
       existingConn.connection.close();
       peerConnectionsRef.current.delete(peerId);
     }
@@ -241,22 +267,33 @@ export const useVoiceCall = (roomId: string | null) => {
       connectionRetryTimeoutsRef.current.delete(peerId);
     }
 
-    console.log(`Creating peer connection with ${peerId}, initiator: ${initiator}`);
+    console.log(`Creating new peer connection with ${peerId}, initiator: ${initiator}`);
     const pc = new RTCPeerConnection(ICE_SERVERS);
     
     const peerConnData: PeerConnection = { 
       peerId, 
       connection: pc, 
       isConnected: false,
-      connectionAttempts: (existingConn?.connectionAttempts || 0) + 1
+      connectionAttempts: (existingConn?.connectionAttempts || 0) + 1,
+      lastAudioCheck: Date.now()
     };
     peerConnectionsRef.current.set(peerId, peerConnData);
     
-    // Add local stream tracks
+    // Add local stream tracks - with verification
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => {
-        pc.addTrack(track, localStreamRef.current!);
+      const audioTracks = localStreamRef.current.getAudioTracks();
+      console.log(`Adding ${audioTracks.length} audio tracks to connection with ${peerId}`);
+      
+      audioTracks.forEach(track => {
+        if (track.readyState === 'live') {
+          pc.addTrack(track, localStreamRef.current!);
+          console.log(`Added audio track to ${peerId}: ${track.label}, enabled: ${track.enabled}`);
+        } else {
+          console.warn(`Skipping non-live track for ${peerId}: ${track.readyState}`);
+        }
       });
+    } else {
+      console.warn(`No local stream available when connecting to ${peerId}`);
     }
 
     // Add screen share tracks if active
@@ -272,6 +309,9 @@ export const useVoiceCall = (roomId: string | null) => {
       const [remoteStream] = event.streams;
       
       if (event.track.kind === 'audio') {
+        // Mark audio activity
+        lastAudioActivityRef.current.set(peerId, Date.now());
+        
         let audioEl = audioElementsRef.current.get(peerId);
         if (!audioEl) {
           audioEl = new Audio();
@@ -279,18 +319,52 @@ export const useVoiceCall = (roomId: string | null) => {
           audioEl.volume = 1;
           audioElementsRef.current.set(peerId, audioEl);
         }
+        
+        // Always update srcObject to ensure fresh stream
         audioEl.srcObject = remoteStream;
         
-        audioEl.play().catch(() => {
-          const resumeAudio = () => {
-            audioEl?.play().catch(() => {});
-            audioContextRef.current?.resume();
-            document.removeEventListener('click', resumeAudio);
-          };
-          document.addEventListener('click', resumeAudio);
-        });
+        // Force play with multiple retry attempts
+        const playAudio = async (retries = 3) => {
+          try {
+            await audioEl!.play();
+            console.log(`✓ Audio playing for ${peerId}`);
+            lastAudioActivityRef.current.set(peerId, Date.now());
+          } catch (err) {
+            console.log(`Audio play attempt failed for ${peerId}, retries left: ${retries}`);
+            if (retries > 0) {
+              setTimeout(() => playAudio(retries - 1), 500);
+            } else {
+              // Final fallback: wait for user interaction
+              const resumeAudio = () => {
+                audioEl?.play().catch(() => {});
+                audioContextRef.current?.resume();
+                document.removeEventListener('click', resumeAudio);
+              };
+              document.addEventListener('click', resumeAudio);
+            }
+          }
+        };
         
+        playAudio();
         setupAudioAnalyser(peerId, remoteStream);
+        
+        // Monitor track state
+        event.track.onended = () => {
+          console.log(`Audio track ended for ${peerId}`);
+          // Attempt to recover connection
+          scheduleReconnection(peerId);
+        };
+        
+        event.track.onmute = () => {
+          console.log(`Audio track muted for ${peerId}`);
+        };
+        
+        event.track.onunmute = () => {
+          console.log(`Audio track unmuted for ${peerId}`);
+          lastAudioActivityRef.current.set(peerId, Date.now());
+          // Ensure audio is playing after unmute
+          audioEl?.play().catch(() => {});
+        };
       } else if (event.track.kind === 'video') {
         // Handle incoming screen share
         let videoEl = videoElementsRef.current.get(peerId);
@@ -336,6 +410,27 @@ export const useVoiceCall = (roomId: string | null) => {
           });
         };
       }
+    };
+    
+    // Schedule reconnection helper
+    const scheduleReconnection = (targetPeerId: string) => {
+      const existingTimeout = connectionRetryTimeoutsRef.current.get(targetPeerId);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+      
+      const timeout = setTimeout(async () => {
+        console.log(`Attempting reconnection with ${targetPeerId}`);
+        const peerConn = peerConnectionsRef.current.get(targetPeerId);
+        if (peerConn && localStreamRef.current) {
+          // Close and recreate connection
+          peerConn.connection.close();
+          peerConnectionsRef.current.delete(targetPeerId);
+          await createPeerConnection(targetPeerId, true);
+        }
+      }, 2000);
+      
+      connectionRetryTimeoutsRef.current.set(targetPeerId, timeout);
     };
 
     // Handle ICE candidates - batch them for better performance
@@ -506,17 +601,51 @@ export const useVoiceCall = (roomId: string | null) => {
     if (!user || !roomId || isJoiningRef.current) return false;
 
     isJoiningRef.current = true;
+    streamReadyRef.current = false;
 
     try {
-      // Get microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+      // Get microphone access with robust error handling
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          }
+        });
+      } catch (mediaErr: any) {
+        console.error('Failed to get media stream:', mediaErr);
+        isJoiningRef.current = false;
+        if (mediaErr.name === 'NotAllowedError') {
+          toast.error('Permissão do microfone negada');
+        } else if (mediaErr.name === 'NotFoundError') {
+          toast.error('Microfone não encontrado');
+        } else {
+          toast.error('Não foi possível acessar o microfone');
         }
-      });
+        return false;
+      }
+
       localStreamRef.current = stream;
+      
+      // Verify the stream is active and has audio tracks
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        console.error('No audio tracks in stream');
+        toast.error('Nenhuma faixa de áudio disponível');
+        isJoiningRef.current = false;
+        return false;
+      }
+      
+      // Ensure audio tracks are enabled
+      audioTracks.forEach(track => {
+        track.enabled = true;
+        console.log(`Audio track ready: ${track.label}, enabled: ${track.enabled}, readyState: ${track.readyState}`);
+      });
+      
+      // Mark stream as ready BEFORE any peer connections
+      streamReadyRef.current = true;
 
       // Setup local audio analyser
       setupAudioAnalyser('local', stream);
@@ -550,16 +679,24 @@ export const useVoiceCall = (roomId: string | null) => {
         setCallDuration(prev => prev + 1);
       }, 1000);
 
-      // Fetch updated participants and connect with staggered timing for multi-party calls
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Start audio health monitoring
+      startAudioHealthCheck();
+
+      // Wait a bit longer to ensure database is updated
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Fetch updated participants
       const updatedParticipants = await fetchParticipants();
       
-      // Connect to each participant with small delay to avoid overwhelming signaling
+      // Connect to each participant with staggered timing for better reliability
       const otherParticipants = updatedParticipants.filter(p => p.user_id !== user.id);
+      console.log(`Connecting to ${otherParticipants.length} other participants`);
+      
       for (let i = 0; i < otherParticipants.length; i++) {
         const participant = otherParticipants[i];
-        // Stagger connections by 200ms each for better reliability with 3+ participants
-        await new Promise(resolve => setTimeout(resolve, i * 200));
+        // Stagger connections by 300ms each for better reliability with 3+ participants
+        await new Promise(resolve => setTimeout(resolve, i * 300));
+        console.log(`Creating connection to ${participant.username} (${participant.user_id})`);
         await createPeerConnection(participant.user_id, true);
       }
 
@@ -568,21 +705,95 @@ export const useVoiceCall = (roomId: string | null) => {
       return true;
     } catch (err: any) {
       console.error('Error joining call:', err);
-      if (err.name === 'NotAllowedError') {
-        toast.error('Permissão do microfone negada');
-      } else if (err.name === 'NotFoundError') {
-        toast.error('Microfone não encontrado');
-      } else {
-        toast.error('Não foi possível entrar na chamada');
-      }
+      streamReadyRef.current = false;
+      toast.error('Não foi possível entrar na chamada');
       isJoiningRef.current = false;
       return false;
     }
   }, [user, roomId, fetchParticipants, createPeerConnection, setupAudioAnalyser]);
+  
+  // Audio health monitoring - check for stale connections
+  const startAudioHealthCheck = useCallback(() => {
+    if (audioHealthCheckRef.current) {
+      clearInterval(audioHealthCheckRef.current);
+    }
+    
+    audioHealthCheckRef.current = setInterval(() => {
+      if (!isInCall || !localStreamRef.current) return;
+      
+      const now = Date.now();
+      
+      // Check each peer connection
+      peerConnectionsRef.current.forEach(async (peerData, peerId) => {
+        const { connection } = peerData;
+        
+        // Check connection state
+        if (connection.connectionState === 'failed' || connection.connectionState === 'disconnected') {
+          console.log(`Connection to ${peerId} is ${connection.connectionState}, attempting recovery`);
+          // Close and recreate
+          connection.close();
+          peerConnectionsRef.current.delete(peerId);
+          await createPeerConnection(peerId, true);
+          return;
+        }
+        
+        // Check if audio element exists and is healthy
+        const audioEl = audioElementsRef.current.get(peerId);
+        if (audioEl) {
+          // Try to resume audio if it got paused somehow
+          if (audioEl.paused && audioEl.srcObject) {
+            console.log(`Audio for ${peerId} is paused, attempting to resume`);
+            audioEl.play().catch(() => {});
+          }
+        }
+        
+        // Check local stream health
+        const audioTracks = localStreamRef.current?.getAudioTracks() || [];
+        for (const track of audioTracks) {
+          if (track.readyState === 'ended') {
+            console.log('Local audio track ended, attempting to recover');
+            // Request new microphone stream
+            try {
+              const newStream = await navigator.mediaDevices.getUserMedia({
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+              });
+              localStreamRef.current = newStream;
+              streamReadyRef.current = true;
+              
+              // Replace tracks on all peer connections
+              const newAudioTrack = newStream.getAudioTracks()[0];
+              peerConnectionsRef.current.forEach(({ connection }) => {
+                const senders = connection.getSenders();
+                const audioSender = senders.find(s => s.track?.kind === 'audio');
+                if (audioSender && newAudioTrack) {
+                  audioSender.replaceTrack(newAudioTrack);
+                }
+              });
+              
+              console.log('Local audio track recovered');
+              toast.info('Microfone reconectado');
+            } catch (err) {
+              console.error('Failed to recover local audio:', err);
+            }
+            break;
+          }
+        }
+      });
+    }, AUDIO_HEALTH_CHECK_INTERVAL);
+  }, [isInCall, createPeerConnection]);
 
   // Leave call
   const leaveCall = useCallback(async () => {
     if (!user || !roomId) return;
+
+    // Clear stream ready flag
+    streamReadyRef.current = false;
+
+    // Stop audio health check
+    if (audioHealthCheckRef.current) {
+      clearInterval(audioHealthCheckRef.current);
+      audioHealthCheckRef.current = null;
+    }
 
     // Stop local stream
     if (localStreamRef.current) {
@@ -611,6 +822,9 @@ export const useVoiceCall = (roomId: string | null) => {
       audio.srcObject = null;
     });
     audioElementsRef.current.clear();
+    
+    // Clear audio activity tracking
+    lastAudioActivityRef.current.clear();
     
     // Stop video elements and clear remote screen shares
     videoElementsRef.current.forEach(video => {
@@ -781,13 +995,33 @@ export const useVoiceCall = (roomId: string | null) => {
         async (payload) => {
           await fetchParticipants();
           
+          // New participant joined - create connection if we have a stream ready
           if (payload.eventType === 'INSERT' || 
               (payload.eventType === 'UPDATE' && (payload.new as any).is_active && !(payload.old as any)?.is_active)) {
             const newUserId = (payload.new as any).user_id;
-            if (newUserId !== user.id && localStreamRef.current) {
-              setTimeout(async () => {
-                await createPeerConnection(newUserId, true);
-              }, 1000);
+            if (newUserId !== user.id) {
+              console.log(`New participant detected: ${newUserId}`);
+              
+              // Wait for stream to be ready before connecting
+              if (!streamReadyRef.current || !localStreamRef.current) {
+                console.log(`Waiting for local stream before connecting to ${newUserId}`);
+                // Wait up to 3 seconds for stream
+                let waited = 0;
+                while ((!streamReadyRef.current || !localStreamRef.current) && waited < 3000) {
+                  await new Promise(r => setTimeout(r, 200));
+                  waited += 200;
+                }
+              }
+              
+              if (streamReadyRef.current && localStreamRef.current) {
+                // Delay connection to avoid race conditions
+                setTimeout(async () => {
+                  console.log(`Creating connection to new participant ${newUserId}`);
+                  await createPeerConnection(newUserId, true);
+                }, 800);
+              } else {
+                console.warn(`Could not connect to ${newUserId} - stream not ready`);
+              }
             }
           }
           
@@ -837,14 +1071,18 @@ export const useVoiceCall = (roomId: string | null) => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (speakingIntervalRef.current) clearInterval(speakingIntervalRef.current);
+      if (audioHealthCheckRef.current) clearInterval(audioHealthCheckRef.current);
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
       }
+      streamReadyRef.current = false;
       peerConnectionsRef.current.forEach(({ connection }) => connection.close());
       audioElementsRef.current.forEach(audio => {
         audio.pause();
         audio.srcObject = null;
       });
+      lastAudioActivityRef.current.clear();
+      connectionRetryTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
     };
   }, []);
 
