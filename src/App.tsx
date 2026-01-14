@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
+import { VoiceCallProvider } from "@/contexts/VoiceCallContext";
+import { GlobalMinimizedCallBar } from "@/components/chat/GlobalMinimizedCallBar";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Invite from "./pages/Invite";
@@ -26,12 +28,15 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/invite/:code" element={<Invite />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <VoiceCallProvider>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/invite/:code" element={<Invite />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              <GlobalMinimizedCallBar />
+            </VoiceCallProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

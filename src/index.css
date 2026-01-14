@@ -41,6 +41,10 @@
     --away: 38 92% 50%;
     --busy: 0 84% 60%;
 
+    /* Sender message bubble - darker for contrast with links/mentions */
+    --message-sender: 220 13% 25%;
+    --message-sender-foreground: 220 14% 96%;
+
     --sidebar-background: 220 14% 98%;
     --sidebar-foreground: 220 13% 18%;
     --sidebar-primary: 220 90% 56%;
@@ -84,6 +88,10 @@
     --offline: 220 9% 46%;
     --away: 38 92% 50%;
     --busy: 0 84% 60%;
+
+    /* Sender message bubble - darker for contrast with links/mentions */
+    --message-sender: 220 13% 25%;
+    --message-sender-foreground: 220 14% 96%;
 
     --sidebar-background: 220 13% 11%;
     --sidebar-foreground: 220 14% 96%;

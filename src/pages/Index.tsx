@@ -87,7 +87,14 @@ const Index = () => {
     }
   };
 
-  // DM functionality removed - groups only app
+  const handleStartDM = async (friendId: string) => {
+    const roomId = await startDirectMessage(friendId);
+    if (roomId) {
+      await refreshRooms();
+      setActiveRoomId(roomId);
+    }
+    return roomId;
+  };
 
   const handleJoinByCode = async (code: string) => {
     const roomId = await joinByCode(code);
@@ -173,7 +180,21 @@ const Index = () => {
     createdAt: new Date(r.created_at),
   }));
 
-  // DM transformation removed - groups only app
+  // Transform DMs for sidebar
+  const directMessages = rooms.filter(r => r.type === 'direct').map(r => {
+    const otherMember = r.members?.find(m => m.id !== user.id);
+    return {
+      id: r.id,
+      friendId: otherMember?.id || '',
+      username: otherMember?.username || 'Unknown',
+      avatar: otherMember?.avatar_url || undefined,
+      status: (otherMember?.status || 'offline') as 'online' | 'offline' | 'away' | 'busy',
+      lastMessage: r.last_message ? {
+        content: r.last_message.content,
+        createdAt: new Date(r.last_message.created_at),
+      } : undefined,
+    };
+  });
 
   // Transform messages for chat
   const chatMessages = messages.map(m => ({
@@ -256,6 +277,7 @@ const Index = () => {
     <div className="h-screen bg-background flex overflow-hidden">
       <Sidebar
         rooms={sidebarRooms}
+        directMessages={directMessages}
         currentUser={currentUser}
         activeRoomId={activeRoomId || ''}
         onSelectRoom={handleSelectRoom}
@@ -281,6 +303,7 @@ const Index = () => {
         onRejectRoomInvite={rejectInvite}
         onRoomInviteAccepted={handleInviteAccepted}
         onInviteFriendToRoom={handleInviteFriendToRoom}
+        onStartDirectMessage={handleStartDM}
       />
       
       <ChatView

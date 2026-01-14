@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "./UserAvatar";
 import { ScreenShareViewer } from "./ScreenShareViewer";
@@ -10,10 +10,12 @@ import {
   Users,
   Volume2,
   Monitor,
-  MonitorOff
+  MonitorOff,
+  Minimize2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useVoiceCall, Participant } from "@/hooks/useVoiceCall";
+import { useVoiceCallContext } from "@/contexts/VoiceCallContext";
 
 interface User {
   id: string;
@@ -53,7 +55,19 @@ export function VoiceCallPanel({
     stopScreenShare,
   } = useVoiceCall(roomId);
 
+  const voiceCallContext = useVoiceCallContext();
   const [isJoining, setIsJoining] = useState(false);
+
+  // Sync with global context
+  useEffect(() => {
+    voiceCallContext.setCallState({
+      isInCall,
+      roomId,
+      roomName,
+      isMuted,
+      callDuration,
+    });
+  }, [isInCall, roomId, roomName, isMuted, callDuration]);
 
   const formatDuration = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
@@ -74,6 +88,12 @@ export function VoiceCallPanel({
 
   const handleLeaveCall = async () => {
     await leaveCall();
+    voiceCallContext.endCall();
+    onClose?.();
+  };
+
+  const handleMinimize = () => {
+    voiceCallContext.minimizeCall();
     onClose?.();
   };
 
@@ -227,6 +247,15 @@ export function VoiceCallPanel({
                 title={isScreenSharing ? "Parar compartilhamento" : "Compartilhar tela"}
               >
                 {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                className="rounded-full w-12 h-12"
+                onClick={handleMinimize}
+                title="Minimizar chamada"
+              >
+                <Minimize2 className="w-5 h-5" />
               </Button>
               <Button
                 variant="destructive"
