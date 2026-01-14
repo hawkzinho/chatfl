@@ -185,69 +185,87 @@ export const useFriendships = () => {
     toast.info('Friend removed');
   };
 
-  const startDirectMessage = async (friendId: string) => {
+  const startDirectMessage = async (friendId: string): Promise<string | null> => {
     if (!user) return null;
 
-    // Check if DM room already exists
-    const { data: existingRooms } = await supabase
-      .from('room_members')
-      .select(`
-        room_id,
-        chat_rooms!inner (id, type)
-      `)
-      .eq('user_id', user.id);
+    try {
+      // Check if DM room already exists
+      const { data: existingRooms } = await supabase
+        .from('room_members')
+        .select(`
+          room_id,
+          chat_rooms!inner (id, type)
+        `)
+        .eq('user_id', user.id);
 
-    for (const room of existingRooms || []) {
-      if ((room.chat_rooms as any).type === 'direct') {
-        const { data: members } = await supabase
-          .from('room_members')
-          .select('user_id')
-          .eq('room_id', room.room_id);
-        
-        const memberIds = members?.map(m => m.user_id) || [];
-        if (memberIds.includes(friendId) && memberIds.length === 2) {
-          return room.room_id;
+      for (const room of existingRooms || []) {
+        if ((room.chat_rooms as any).type === 'direct') {
+          const { data: members } = await supabase
+            .from('room_members')
+            .select('user_id')
+            .eq('room_id', room.room_id);
+          
+          const memberIds = members?.map(m => m.user_id) || [];
+          if (memberIds.includes(friendId) && memberIds.length === 2) {
+            // DM already exists, return it immediately
+            return room.room_id;
+          }
         }
       }
-    }
 
-    // Create new DM room
-    const { data: friend } = await supabase
-      .from('profiles')
-      .select('username')
-      .eq('id', friendId)
-      .single();
+      // Create new DM room
+      const { data: friend } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', friendId)
+        .single();
 
-    const { data: myProfile } = await supabase
-      .from('profiles')
-      .select('username')
-      .eq('id', user.id)
-      .single();
+      const { data: myProfile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single();
 
-    const { data: newRoom, error: roomError } = await supabase
-      .from('chat_rooms')
-      .insert({
-        name: `${myProfile?.username} & ${friend?.username}`,
-        type: 'direct',
-        created_by: user.id,
-      })
-      .select()
-      .single();
+      const { data: newRoom, error: roomError } = await supabase
+        .from('chat_rooms')
+        .insert({
+          name: `${myProfile?.username} & ${friend?.username}`,
+          type: 'direct',
+          created_by: user.id,
+        })
+        .select()
+        .single();
 
-    if (roomError) {
-      toast.error('Failed to create conversation');
+      if (roomError) {
+        console.error('Failed to create DM room:', roomError);
+        toast.error('Falha ao criar conversa');
+        return null;
+      }
+
+      // Add both users to the room - do this sequentially to avoid race conditions
+      const { error: member1Error } = await supabase
+        .from('room_members')
+        .insert({ room_id: newRoom.id, user_id: user.id, role: 'member' });
+
+      if (member1Error) {
+        console.error('Failed to add current user to DM:', member1Error);
+      }
+
+      const { error: member2Error } = await supabase
+        .from('room_members')
+        .insert({ room_id: newRoom.id, user_id: friendId, role: 'member' });
+
+      if (member2Error) {
+        console.error('Failed to add friend to DM:', member2Error);
+      }
+
+      toast.success(`Conversa iniciada com ${friend?.username}`);
+      return newRoom.id;
+    } catch (error) {
+      console.error('Error in startDirectMessage:', error);
+      toast.error('Erro ao iniciar conversa');
       return null;
     }
-
-    // Add both users to the room
-    await supabase
-      .from('room_members')
-      .insert([
-        { room_id: newRoom.id, user_id: user.id, role: 'member' },
-        { room_id: newRoom.id, user_id: friendId, role: 'member' },
-      ]);
-
-    return newRoom.id;
   };
 
   return {

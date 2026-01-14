@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
@@ -121,6 +121,24 @@ export function ChatView({
     startScreenShare,
     stopScreenShare,
   } = useVoiceCall(room?.id || null);
+
+  // Sync call state with global context for ALL participants (not just creator)
+  useEffect(() => {
+    if (isInCall && room) {
+      voiceCallContext.setCallState({
+        isInCall: true,
+        roomId: room.id,
+        roomName: room.name,
+        isMuted,
+        callDuration,
+      });
+      // Store call function references for global minimized bar
+      voiceCallContext.callFunctionsRef.current = {
+        toggleMute,
+        leaveCall,
+      };
+    }
+  }, [isInCall, room, isMuted, callDuration, toggleMute, leaveCall]);
 
   // Check if currently in this room's call (not minimized)
   const showCallScreen = isInCall && !voiceCallContext.isMinimized;

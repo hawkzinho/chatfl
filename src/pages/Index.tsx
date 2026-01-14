@@ -88,12 +88,22 @@ const Index = () => {
   };
 
   const handleStartDM = async (friendId: string) => {
-    const roomId = await startDirectMessage(friendId);
-    if (roomId) {
-      await refreshRooms();
-      setActiveRoomId(roomId);
+    try {
+      const roomId = await startDirectMessage(friendId);
+      if (roomId) {
+        // Refresh rooms first to ensure we have the room data
+        await refreshRooms();
+        // Small delay to ensure state is updated
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // Then set it as active
+        setActiveRoomId(roomId);
+        setReplyingTo(null);
+      }
+      return roomId;
+    } catch (error) {
+      console.error('Error starting DM:', error);
+      return null;
     }
-    return roomId;
   };
 
   const handleJoinByCode = async (code: string) => {
