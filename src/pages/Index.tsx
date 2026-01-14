@@ -17,7 +17,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { user, profile, loading: authLoading, signOut } = useAuth();
   const { rooms, createRoom, refreshRooms, joinByCode, deleteRoom, updateRoom, regenerateInviteCode, leaveRoom } = useRooms();
-  const { friends, pendingRequests, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, removeFriend, startDirectMessage } = useFriendships();
+  const { friends, pendingRequests, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, removeFriend } = useFriendships();
   const { pendingInvites, sendInvite, acceptInvite, rejectInvite } = useRoomInvites();
   
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
@@ -87,23 +87,6 @@ const Index = () => {
     }
   };
 
-  const handleStartDM = async (friendId: string) => {
-    try {
-      const roomId = await startDirectMessage(friendId);
-      if (roomId) {
-        // Refresh rooms to get the updated list
-        await refreshRooms();
-        // Set the room as active
-        setActiveRoomId(roomId);
-        setReplyingTo(null);
-      }
-      return roomId;
-    } catch (error) {
-      console.error('Error starting DM:', error);
-      return null;
-    }
-  };
-
   const handleJoinByCode = async (code: string) => {
     const roomId = await joinByCode(code);
     if (roomId) {
@@ -161,12 +144,12 @@ const Index = () => {
     status: profile.status as 'online' | 'offline' | 'away' | 'busy',
   };
 
-  // Transform rooms for sidebar (exclude DMs)
-  const sidebarRooms = rooms.filter(r => r.type !== 'direct').map(r => ({
+  // Transform rooms for sidebar (channels only - no DMs)
+  const sidebarRooms = rooms.map(r => ({
     id: r.id,
     name: r.name,
     description: r.description || undefined,
-    type: r.type as 'public' | 'private' | 'direct',
+    type: r.type as 'public' | 'private',
     avatar: r.avatar_url || undefined,
     inviteCode: r.invite_code || undefined,
     createdBy: r.created_by || undefined,
@@ -187,33 +170,6 @@ const Index = () => {
     unreadCount: 0,
     createdAt: new Date(r.created_at),
   }));
-
-  // Transform DMs for sidebar - with strict validation
-  const directMessages = rooms
-    .filter(r => r.type === 'direct')
-    .map(r => {
-      // Find the OTHER user in the DM (not the current user)
-      const otherMember = r.members?.find(m => m.id !== user.id);
-      
-      // If we can't find the other member, this DM is invalid
-      if (!otherMember) {
-        console.warn('DM missing other member:', r.id, 'members:', r.members);
-        return null;
-      }
-
-      return {
-        id: r.id,
-        friendId: otherMember.id,
-        username: otherMember.username,
-        avatar: otherMember.avatar_url || undefined,
-        status: (otherMember.status || 'offline') as 'online' | 'offline' | 'away' | 'busy',
-        lastMessage: r.last_message ? {
-          content: r.last_message.content,
-          createdAt: new Date(r.last_message.created_at),
-        } : undefined,
-      };
-    })
-    .filter((dm): dm is NonNullable<typeof dm> => dm !== null); // Remove null entries
 
   // Transform messages for chat
   const chatMessages = messages.map(m => ({
@@ -260,26 +216,14 @@ const Index = () => {
     } : undefined,
   }));
 
-  // Transform active room for chat header - with DM-specific handling
+  // Transform active room for chat header (channels only)
   const activeChatRoom = activeRoom ? {
     id: activeRoom.id,
-    name: activeRoom.type === 'direct' 
-      ? (() => {
-          const other = activeRoom.members?.find(m => m.id !== user.id);
-          return other?.username || 'Conversa';
-        })()
-      : activeRoom.name,
-    description: activeRoom.type === 'direct' 
-      ? undefined // No description for DMs
-      : activeRoom.description || undefined,
-    type: activeRoom.type as 'public' | 'private' | 'direct',
-    avatar: activeRoom.type === 'direct'
-      ? (() => {
-          const other = activeRoom.members?.find(m => m.id !== user.id);
-          return other?.avatar_url || undefined;
-        })()
-      : activeRoom.avatar_url || undefined,
-    inviteCode: activeRoom.type === 'direct' ? undefined : activeRoom.invite_code || undefined,
+    name: activeRoom.name,
+    description: activeRoom.description || undefined,
+    type: activeRoom.type as 'public' | 'private',
+    avatar: activeRoom.avatar_url || undefined,
+    inviteCode: activeRoom.invite_code || undefined,
     createdBy: activeRoom.created_by || undefined,
     members: activeRoom.members?.map(m => ({
       id: m.id,
@@ -306,7 +250,6 @@ const Index = () => {
     <div className="h-screen bg-background flex overflow-hidden">
       <Sidebar
         rooms={sidebarRooms}
-        directMessages={directMessages}
         currentUser={currentUser}
         activeRoomId={activeRoomId || ''}
         onSelectRoom={handleSelectRoom}
@@ -332,7 +275,6 @@ const Index = () => {
         onRejectRoomInvite={rejectInvite}
         onRoomInviteAccepted={handleInviteAccepted}
         onInviteFriendToRoom={handleInviteFriendToRoom}
-        onStartDirectMessage={handleStartDM}
       />
       
       <ChatView

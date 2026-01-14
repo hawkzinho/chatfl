@@ -113,19 +113,10 @@ export const useRooms = () => {
       })
     );
 
-    // Filter out invalid DMs (those with less than 2 members)
-    const validRooms = roomsWithMessages.filter(room => {
-      if (room.type === 'direct') {
-        // DMs MUST have exactly 2 members
-        if (!room.members || room.members.length < 2) {
-          console.warn('Invalid DM detected (less than 2 members), hiding:', room.id);
-          return false;
-        }
-      }
-      return true;
-    });
+    // Filter out DM rooms completely - we only show channels now
+    const channelsOnly = roomsWithMessages.filter(room => room.type !== 'direct');
 
-    setRooms(validRooms);
+    setRooms(channelsOnly);
     setLoading(false);
   };
 

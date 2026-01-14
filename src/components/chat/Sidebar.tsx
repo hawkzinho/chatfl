@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { RoomListItem } from "./RoomListItem";
-import { DMListItem } from "./DMListItem";
 import { UserAvatar } from "./UserAvatar";
 import { RoomInviteNotification } from "./RoomInviteNotification";
 import { ProfileSettingsDialog } from "./ProfileSettingsDialog";
@@ -65,7 +64,7 @@ interface ChatRoom {
   id: string;
   name: string;
   description?: string;
-  type: 'public' | 'private' | 'direct';
+  type: 'public' | 'private';
   avatar?: string;
   inviteCode?: string;
   createdBy?: string;
@@ -97,22 +96,9 @@ interface RoomInvite {
   };
 }
 
-interface DirectMessage {
-  id: string;
-  friendId: string;
-  username: string;
-  avatar?: string;
-  status: 'online' | 'offline' | 'away' | 'busy';
-  lastMessage?: {
-    content: string;
-    createdAt: Date;
-  };
-}
-
 interface SidebarProps {
   currentUser: User;
   rooms: ChatRoom[];
-  directMessages?: DirectMessage[];
   activeRoomId?: string;
   onSelectRoom: (roomId: string) => void;
   onCreateRoom?: (name: string, description?: string) => void;
@@ -129,14 +115,12 @@ interface SidebarProps {
   onRejectRoomInvite?: (inviteId: string) => Promise<void>;
   onRoomInviteAccepted?: (roomId: string) => void;
   onInviteFriendToRoom?: (friendId: string, roomId: string) => Promise<boolean>;
-  onStartDirectMessage?: (friendId: string) => Promise<string | null>;
   onProfileUpdate?: () => void;
 }
 
 export function Sidebar({
   currentUser,
   rooms,
-  directMessages = [],
   activeRoomId,
   onSelectRoom,
   onCreateRoom,
@@ -153,13 +137,11 @@ export function Sidebar({
   onRejectRoomInvite,
   onRoomInviteAccepted,
   onInviteFriendToRoom,
-  onStartDirectMessage,
   onProfileUpdate,
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [roomsOpen, setRoomsOpen] = useState(true);
   const [friendsOpen, setFriendsOpen] = useState(true);
-  const [dmsOpen, setDmsOpen] = useState(true);
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [addFriendOpen, setAddFriendOpen] = useState(false);
   const [joinRoomOpen, setJoinRoomOpen] = useState(false);
@@ -225,15 +207,6 @@ export function Sidebar({
 
     if (onInviteFriendToRoom) {
       await onInviteFriendToRoom(friendId, activeRoomId);
-    }
-  };
-
-  const handleStartDM = async (friendId: string) => {
-    if (onStartDirectMessage) {
-      const roomId = await onStartDirectMessage(friendId);
-      if (roomId) {
-        onSelectRoom(roomId);
-      }
     }
   };
 
@@ -418,33 +391,6 @@ export function Sidebar({
           </CollapsibleContent>
         </Collapsible>
 
-        {/* Direct Messages Section */}
-        <Collapsible open={dmsOpen} onOpenChange={setDmsOpen}>
-          <div className="flex items-center justify-between mb-1">
-            <CollapsibleTrigger className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-              <ChevronDown className={cn('w-3 h-3 transition-transform', !dmsOpen && '-rotate-90')} />
-              Mensagens Diretas ({directMessages.length})
-            </CollapsibleTrigger>
-          </div>
-          <CollapsibleContent className="space-y-0.5">
-            {directMessages.length === 0 ? (
-              <div className="px-3 py-4 text-center">
-                <MessageSquare className="w-6 h-6 text-muted-foreground/50 mx-auto mb-1" />
-                <p className="text-xs text-muted-foreground">Nenhuma conversa</p>
-              </div>
-            ) : (
-              directMessages.map((dm) => (
-                <DMListItem
-                  key={dm.id}
-                  dm={dm}
-                  isActive={dm.id === activeRoomId}
-                  onClick={() => onSelectRoom(dm.id)}
-                />
-              ))
-            )}
-          </CollapsibleContent>
-        </Collapsible>
-
         {/* Friends Section */}
         <Collapsible open={friendsOpen} onOpenChange={setFriendsOpen}>
           <div className="flex items-center justify-between mb-1">
@@ -524,12 +470,6 @@ export function Sidebar({
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {onStartDirectMessage && (
-                        <DropdownMenuItem onClick={() => handleStartDM(friend.id)}>
-                          <MessageSquare className="w-4 h-4 mr-2" />
-                          Enviar Mensagem
-                        </DropdownMenuItem>
-                      )}
                       {canInviteToRoom && onInviteFriendToRoom && (
                         <DropdownMenuItem onClick={() => handleInviteFriendToRoom(friend.id)}>
                           <Users className="w-4 h-4 mr-2" />
