@@ -368,6 +368,48 @@ export const useRooms = () => {
     return room.id;
   };
 
+  const removeMember = async (roomId: string, userId: string) => {
+    if (!user) return;
+
+    // Check if current user is the room owner
+    const room = rooms.find(r => r.id === roomId);
+    if (!room || room.created_by !== user.id) {
+      toast.error('Apenas o dono do grupo pode remover membros');
+      return;
+    }
+
+    // Cannot remove yourself
+    if (userId === user.id) {
+      toast.error('Você não pode remover a si mesmo');
+      return;
+    }
+
+    // Get the member's username for system message
+    const { data: memberProfile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', userId)
+      .single();
+
+    const { error } = await supabase
+      .from('room_members')
+      .delete()
+      .eq('room_id', roomId)
+      .eq('user_id', userId);
+
+    if (error) {
+      toast.error('Falha ao remover membro');
+      console.error(error);
+      return;
+    }
+
+    // Send system message
+    await sendSystemMessage(roomId, user.id, `🚫 ${memberProfile?.username || 'Usuário'} foi removido do grupo`);
+
+    await fetchRooms();
+    toast.success('Membro removido');
+  };
+
   return {
     rooms,
     loading,
@@ -378,6 +420,7 @@ export const useRooms = () => {
     deleteRoom,
     updateRoom,
     regenerateInviteCode,
+    removeMember,
     refreshRooms: fetchRooms,
   };
 };

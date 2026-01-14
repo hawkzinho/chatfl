@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 const Index = () => {
   const navigate = useNavigate();
   const { user, profile, loading: authLoading, signOut } = useAuth();
-  const { rooms, createRoom, refreshRooms, joinByCode, deleteRoom, updateRoom, regenerateInviteCode, leaveRoom } = useRooms();
+  const { rooms, createRoom, refreshRooms, joinByCode, deleteRoom, updateRoom, regenerateInviteCode, leaveRoom, removeMember } = useRooms();
   const { friends, pendingRequests, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, removeFriend } = useFriendships();
   const { pendingInvites, sendInvite, acceptInvite, rejectInvite } = useRoomInvites();
   
@@ -106,6 +106,10 @@ const Index = () => {
     if (activeRoomId === roomId) {
       setActiveRoomId(rooms.length > 1 ? rooms.find(r => r.id !== roomId)?.id || null : null);
     }
+  };
+
+  const handleRemoveMember = async (roomId: string, userId: string) => {
+    await removeMember(roomId, userId);
   };
 
   const handleInviteAccepted = async (roomId: string) => {
@@ -308,6 +312,7 @@ const Index = () => {
         onLeaveRoom={handleLeaveRoom}
         onUpdateRoom={updateRoom}
         onRegenerateCode={regenerateInviteCode}
+        onRemoveMember={handleRemoveMember}
         friends={friendsList}
         onInviteFriend={handleSendRoomInvite}
       />

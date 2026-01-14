@@ -76,6 +76,7 @@ interface ChatViewProps {
   onLeaveRoom?: (roomId: string) => Promise<void>;
   onUpdateRoom?: (roomId: string, name: string, description: string, avatarUrl?: string) => Promise<void>;
   onRegenerateCode?: (roomId: string) => Promise<void>;
+  onRemoveMember?: (roomId: string, userId: string) => Promise<void>;
   friends?: Friend[];
   onInviteFriend?: (friendId: string) => void;
 }
@@ -99,6 +100,7 @@ export function ChatView({
   onLeaveRoom,
   onUpdateRoom,
   onRegenerateCode,
+  onRemoveMember,
   friends = [],
   onInviteFriend,
 }: ChatViewProps) {
@@ -219,6 +221,7 @@ export function ChatView({
         onLeaveRoom={onLeaveRoom}
         onUpdateRoom={onUpdateRoom}
         onRegenerateCode={onRegenerateCode}
+        onRemoveMember={onRemoveMember}
       />
 
       {/* Active call banner - show when there's an active call */}
