@@ -162,7 +162,7 @@ export function MessageItem({
           className={cn(
             'rounded-lg px-3 py-2 transition-colors',
             isOwn
-              ? 'bg-primary text-primary-foreground'
+              ? 'bg-message-sender text-message-sender-foreground'
               : 'bg-muted'
           )}
         >
