@@ -14,6 +14,7 @@ import {
   Link,
   Share2,
   Phone,
+  User,
   X
 } from "lucide-react";
 import {
@@ -76,7 +77,14 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [voiceCallOpen, setVoiceCallOpen] = useState(false);
+  
+  // For DMs, find the other user
+  const otherUser = room.type === 'direct' 
+    ? room.members.find(m => m.id !== currentUserId)
+    : null;
+
   const onlineMembers = room.members.filter(m => m.status === 'online').length;
+  const isDM = room.type === 'direct';
 
   const getInviteLink = () => {
     if (room.inviteCode) {
@@ -101,7 +109,10 @@ export function ChatHeader({
   };
 
   const handleLeave = async () => {
-    if (confirm('Tem certeza que deseja sair deste canal?')) {
+    const message = isDM 
+      ? 'Tem certeza que deseja sair desta conversa?' 
+      : 'Tem certeza que deseja sair deste canal?';
+    if (confirm(message)) {
       await onLeaveRoom?.(room.id);
     }
   };
@@ -116,7 +127,15 @@ export function ChatHeader({
     <>
       <div className="h-14 px-4 flex items-center justify-between border-b border-border bg-card">
         <div className="flex items-center gap-3 min-w-0">
-          {room.avatar ? (
+          {/* Avatar - Different handling for DMs */}
+          {isDM ? (
+            <UserAvatar
+              src={otherUser?.avatar}
+              username={otherUser?.username || room.name}
+              status={otherUser?.status}
+              size="sm"
+            />
+          ) : room.avatar ? (
             <div className="w-8 h-8 rounded-md overflow-hidden">
               <img 
                 src={room.avatar} 
@@ -135,7 +154,8 @@ export function ChatHeader({
               <h2 className="font-medium text-foreground truncate">
                 {room.name}
               </h2>
-              {room.inviteCode && (
+              {/* Only show invite code for non-DM rooms */}
+              {!isDM && room.inviteCode && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -151,7 +171,10 @@ export function ChatHeader({
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              {room.description || `${room.members.length} membros • ${onlineMembers} online`}
+              {isDM 
+                ? (otherUser?.status === 'online' ? 'Online' : 'Offline')
+                : (room.description || `${room.members.length} membros • ${onlineMembers} online`)
+              }
             </p>
           </div>
         </div>
@@ -169,7 +192,8 @@ export function ChatHeader({
             <TooltipContent>Chamada de voz</TooltipContent>
           </Tooltip>
 
-          {room.inviteCode && (
+          {/* Only show invite link button for non-DM rooms */}
+          {!isDM && room.inviteCode && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button 
@@ -183,14 +207,17 @@ export function ChatHeader({
             </Tooltip>
           )}
           
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button className="p-2 rounded-md hover:bg-muted transition-colors">
-                <Users className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{room.members.length} membros</TooltipContent>
-          </Tooltip>
+          {/* Only show members count for non-DM rooms */}
+          {!isDM && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button className="p-2 rounded-md hover:bg-muted transition-colors">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{room.members.length} membros</TooltipContent>
+            </Tooltip>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -199,7 +226,8 @@ export function ChatHeader({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              {room.inviteCode && (
+              {/* Only show invite options for non-DM rooms */}
+              {!isDM && room.inviteCode && (
                 <>
                   <DropdownMenuItem onClick={copyInviteLink}>
                     <Link className="w-4 h-4 mr-2" />
@@ -212,14 +240,25 @@ export function ChatHeader({
                 </>
               )}
               
-              <DropdownMenuItem onClick={() => setEditorOpen(true)}>
-                <Settings className="w-4 h-4 mr-2" />
-                Configurações do Canal
-              </DropdownMenuItem>
+              {/* Only show settings for non-DM rooms */}
+              {!isDM && (
+                <DropdownMenuItem onClick={() => setEditorOpen(true)}>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Configurações do Canal
+                </DropdownMenuItem>
+              )}
               
               <DropdownMenuSeparator />
               
-              {isOwner ? (
+              {isDM ? (
+                <DropdownMenuItem 
+                  onClick={handleLeave}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Fechar Conversa
+                </DropdownMenuItem>
+              ) : isOwner ? (
                 <DropdownMenuItem 
                   onClick={handleDelete}
                   className="text-destructive focus:text-destructive"
@@ -241,7 +280,8 @@ export function ChatHeader({
         </div>
       </div>
 
-      {onUpdateRoom && onDeleteRoom && (
+      {/* Only show room editor for non-DM rooms */}
+      {!isDM && onUpdateRoom && onDeleteRoom && (
         <RoomEditorDialog
           open={editorOpen}
           onOpenChange={setEditorOpen}

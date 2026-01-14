@@ -74,7 +74,7 @@ export const useRooms = () => {
       ?.filter(mr => mr.chat_rooms)
       .map(mr => mr.chat_rooms as Room) || [];
 
-    // Fetch last message for each room
+    // Fetch last message and members for each room
     const roomsWithMessages = await Promise.all(
       roomsData.map(async (room) => {
         const { data: messages } = await supabase
@@ -88,12 +88,18 @@ export const useRooms = () => {
           .order('created_at', { ascending: false })
           .limit(1);
 
-        const { data: members } = await supabase
+        const { data: membersData } = await supabase
           .from('room_members')
           .select(`
+            user_id,
             profiles (id, username, avatar_url, status)
           `)
           .eq('room_id', room.id);
+
+        // Extract profiles from members data
+        const members = membersData
+          ?.filter(m => m.profiles)
+          .map(m => m.profiles as Profile) || [];
 
         return {
           ...room,
@@ -102,12 +108,24 @@ export const useRooms = () => {
             sender_username: (messages[0].profiles as any)?.username || 'Unknown',
             created_at: messages[0].created_at,
           } : undefined,
-          members: members?.map(m => m.profiles as Profile) || [],
+          members,
         };
       })
     );
 
-    setRooms(roomsWithMessages);
+    // Filter out invalid DMs (those with less than 2 members)
+    const validRooms = roomsWithMessages.filter(room => {
+      if (room.type === 'direct') {
+        // DMs MUST have exactly 2 members
+        if (!room.members || room.members.length < 2) {
+          console.warn('Invalid DM detected (less than 2 members), hiding:', room.id);
+          return false;
+        }
+      }
+      return true;
+    });
+
+    setRooms(validRooms);
     setLoading(false);
   };
 

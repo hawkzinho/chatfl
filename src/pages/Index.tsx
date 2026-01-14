@@ -91,11 +91,9 @@ const Index = () => {
     try {
       const roomId = await startDirectMessage(friendId);
       if (roomId) {
-        // Refresh rooms first to ensure we have the room data
+        // Refresh rooms to get the updated list
         await refreshRooms();
-        // Small delay to ensure state is updated
-        await new Promise(resolve => setTimeout(resolve, 100));
-        // Then set it as active
+        // Set the room as active
         setActiveRoomId(roomId);
         setReplyingTo(null);
       }
@@ -163,7 +161,7 @@ const Index = () => {
     status: profile.status as 'online' | 'offline' | 'away' | 'busy',
   };
 
-  // Transform rooms for sidebar
+  // Transform rooms for sidebar (exclude DMs)
   const sidebarRooms = rooms.filter(r => r.type !== 'direct').map(r => ({
     id: r.id,
     name: r.name,
@@ -190,21 +188,32 @@ const Index = () => {
     createdAt: new Date(r.created_at),
   }));
 
-  // Transform DMs for sidebar
-  const directMessages = rooms.filter(r => r.type === 'direct').map(r => {
-    const otherMember = r.members?.find(m => m.id !== user.id);
-    return {
-      id: r.id,
-      friendId: otherMember?.id || '',
-      username: otherMember?.username || 'Unknown',
-      avatar: otherMember?.avatar_url || undefined,
-      status: (otherMember?.status || 'offline') as 'online' | 'offline' | 'away' | 'busy',
-      lastMessage: r.last_message ? {
-        content: r.last_message.content,
-        createdAt: new Date(r.last_message.created_at),
-      } : undefined,
-    };
-  });
+  // Transform DMs for sidebar - with strict validation
+  const directMessages = rooms
+    .filter(r => r.type === 'direct')
+    .map(r => {
+      // Find the OTHER user in the DM (not the current user)
+      const otherMember = r.members?.find(m => m.id !== user.id);
+      
+      // If we can't find the other member, this DM is invalid
+      if (!otherMember) {
+        console.warn('DM missing other member:', r.id, 'members:', r.members);
+        return null;
+      }
+
+      return {
+        id: r.id,
+        friendId: otherMember.id,
+        username: otherMember.username,
+        avatar: otherMember.avatar_url || undefined,
+        status: (otherMember.status || 'offline') as 'online' | 'offline' | 'away' | 'busy',
+        lastMessage: r.last_message ? {
+          content: r.last_message.content,
+          createdAt: new Date(r.last_message.created_at),
+        } : undefined,
+      };
+    })
+    .filter((dm): dm is NonNullable<typeof dm> => dm !== null); // Remove null entries
 
   // Transform messages for chat
   const chatMessages = messages.map(m => ({
@@ -251,16 +260,26 @@ const Index = () => {
     } : undefined,
   }));
 
-  // Transform active room for chat header
+  // Transform active room for chat header - with DM-specific handling
   const activeChatRoom = activeRoom ? {
     id: activeRoom.id,
     name: activeRoom.type === 'direct' 
-      ? activeRoom.members?.find(m => m.id !== user.id)?.username || 'Desconhecido'
+      ? (() => {
+          const other = activeRoom.members?.find(m => m.id !== user.id);
+          return other?.username || 'Conversa';
+        })()
       : activeRoom.name,
-    description: activeRoom.description || undefined,
+    description: activeRoom.type === 'direct' 
+      ? undefined // No description for DMs
+      : activeRoom.description || undefined,
     type: activeRoom.type as 'public' | 'private' | 'direct',
-    avatar: activeRoom.avatar_url || undefined,
-    inviteCode: activeRoom.invite_code || undefined,
+    avatar: activeRoom.type === 'direct'
+      ? (() => {
+          const other = activeRoom.members?.find(m => m.id !== user.id);
+          return other?.avatar_url || undefined;
+        })()
+      : activeRoom.avatar_url || undefined,
+    inviteCode: activeRoom.type === 'direct' ? undefined : activeRoom.invite_code || undefined,
     createdBy: activeRoom.created_by || undefined,
     members: activeRoom.members?.map(m => ({
       id: m.id,
