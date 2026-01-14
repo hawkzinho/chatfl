@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { RoomListItem } from "./RoomListItem";
+import { DMListItem } from "./DMListItem";
 import { UserAvatar } from "./UserAvatar";
 import { RoomInviteNotification } from "./RoomInviteNotification";
 import { ProfileSettingsDialog } from "./ProfileSettingsDialog";
@@ -433,34 +434,12 @@ export function Sidebar({
               </div>
             ) : (
               directMessages.map((dm) => (
-                <button
+                <DMListItem
                   key={dm.id}
+                  dm={dm}
+                  isActive={dm.id === activeRoomId}
                   onClick={() => onSelectRoom(dm.id)}
-                  className={cn(
-                    'w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors',
-                    'hover:bg-muted',
-                    dm.id === activeRoomId && 'bg-muted ring-1 ring-primary/30'
-                  )}
-                >
-                  <UserAvatar
-                    src={dm.avatar}
-                    username={dm.username}
-                    status={dm.status}
-                    size="sm"
-                  />
-                  <div className="flex-1 min-w-0 text-left">
-                    <span className="text-sm font-medium truncate block">{dm.username}</span>
-                    {dm.lastMessage && (
-                      <span className="text-xs text-muted-foreground truncate block">
-                        {dm.lastMessage.content}
-                      </span>
-                    )}
-                  </div>
-                  <span className={cn(
-                    "w-2 h-2 rounded-full shrink-0",
-                    dm.status === 'online' ? 'bg-green-500' : 'bg-muted-foreground/30'
-                  )} />
-                </button>
+                />
               ))
             )}
           </CollapsibleContent>
