@@ -189,78 +189,147 @@ export const useFriendships = () => {
     if (!user) return null;
 
     try {
-      // Check if DM room already exists
-      const { data: existingRooms } = await supabase
+      // 1. Get friend profile first to validate they exist
+      const { data: friendProfile, error: friendError } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url, status')
+        .eq('id', friendId)
+        .single();
+
+      if (friendError || !friendProfile) {
+        console.error('Friend profile not found:', friendError);
+        toast.error('Usuário não encontrado');
+        return null;
+      }
+
+      // 2. Get current user profile
+      const { data: myProfile, error: myError } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url, status')
+        .eq('id', user.id)
+        .single();
+
+      if (myError || !myProfile) {
+        console.error('My profile not found:', myError);
+        toast.error('Erro ao carregar seu perfil');
+        return null;
+      }
+
+      // 3. Check if DM already exists between these two users
+      // We need to find rooms where BOTH users are members and type is 'direct'
+      const { data: myRooms } = await supabase
         .from('room_members')
-        .select(`
-          room_id,
-          chat_rooms!inner (id, type)
-        `)
+        .select('room_id')
         .eq('user_id', user.id);
 
-      for (const room of existingRooms || []) {
-        if ((room.chat_rooms as any).type === 'direct') {
-          const { data: members } = await supabase
-            .from('room_members')
-            .select('user_id')
-            .eq('room_id', room.room_id);
-          
-          const memberIds = members?.map(m => m.user_id) || [];
-          if (memberIds.includes(friendId) && memberIds.length === 2) {
-            // DM already exists, return it immediately
-            return room.room_id;
+      const myRoomIds = myRooms?.map(r => r.room_id) || [];
+
+      if (myRoomIds.length > 0) {
+        // Check which of my rooms has the friend as member AND is type 'direct'
+        for (const roomId of myRoomIds) {
+          // Check room type
+          const { data: room } = await supabase
+            .from('chat_rooms')
+            .select('id, type')
+            .eq('id', roomId)
+            .eq('type', 'direct')
+            .single();
+
+          if (room) {
+            // Check if friend is a member
+            const { data: friendMember } = await supabase
+              .from('room_members')
+              .select('id')
+              .eq('room_id', roomId)
+              .eq('user_id', friendId)
+              .single();
+
+            if (friendMember) {
+              // DM already exists, return it
+              console.log('Existing DM found:', roomId);
+              return roomId;
+            }
           }
         }
       }
 
-      // Create new DM room
-      const { data: friend } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', friendId)
-        .single();
-
-      const { data: myProfile } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', user.id)
-        .single();
-
+      // 4. No existing DM found - create new one
+      // DM name is stored as both usernames for internal reference
+      const dmName = `DM:${myProfile.username}:${friendProfile.username}`;
+      
       const { data: newRoom, error: roomError } = await supabase
         .from('chat_rooms')
         .insert({
-          name: `${myProfile?.username} & ${friend?.username}`,
+          name: dmName,
           type: 'direct',
           created_by: user.id,
         })
         .select()
         .single();
 
-      if (roomError) {
+      if (roomError || !newRoom) {
         console.error('Failed to create DM room:', roomError);
         toast.error('Falha ao criar conversa');
         return null;
       }
 
-      // Add both users to the room - do this sequentially to avoid race conditions
+      console.log('Created new DM room:', newRoom.id);
+
+      // 5. Add BOTH users to the room - this is critical
+      // Add current user first
       const { error: member1Error } = await supabase
         .from('room_members')
-        .insert({ room_id: newRoom.id, user_id: user.id, role: 'member' });
+        .insert({ 
+          room_id: newRoom.id, 
+          user_id: user.id, 
+          role: 'member' 
+        });
 
       if (member1Error) {
         console.error('Failed to add current user to DM:', member1Error);
+        // Rollback: delete the room
+        await supabase.from('chat_rooms').delete().eq('id', newRoom.id);
+        toast.error('Erro ao criar conversa');
+        return null;
       }
 
+      // Add friend
       const { error: member2Error } = await supabase
         .from('room_members')
-        .insert({ room_id: newRoom.id, user_id: friendId, role: 'member' });
+        .insert({ 
+          room_id: newRoom.id, 
+          user_id: friendId, 
+          role: 'member' 
+        });
 
       if (member2Error) {
         console.error('Failed to add friend to DM:', member2Error);
+        // Rollback: delete the room and membership
+        await supabase.from('room_members').delete().eq('room_id', newRoom.id);
+        await supabase.from('chat_rooms').delete().eq('id', newRoom.id);
+        toast.error('Erro ao adicionar participante');
+        return null;
       }
 
-      toast.success(`Conversa iniciada com ${friend?.username}`);
+      // 6. Verify both members were added
+      const { data: members, error: verifyError } = await supabase
+        .from('room_members')
+        .select('user_id')
+        .eq('room_id', newRoom.id);
+
+      if (verifyError || !members || members.length !== 2) {
+        console.error('DM verification failed - expected 2 members, got:', members?.length);
+        // Cleanup
+        await supabase.from('room_members').delete().eq('room_id', newRoom.id);
+        await supabase.from('chat_rooms').delete().eq('id', newRoom.id);
+        toast.error('Erro ao verificar conversa');
+        return null;
+      }
+
+      console.log('DM created successfully with 2 members');
+      toast.success(`Conversa iniciada com ${friendProfile.username}`);
       return newRoom.id;
+
     } catch (error) {
       console.error('Error in startDirectMessage:', error);
       toast.error('Erro ao iniciar conversa');
