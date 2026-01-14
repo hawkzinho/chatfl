@@ -1,9 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { UserAvatar } from "./UserAvatar";
 import { RoomEditorDialog } from "./RoomEditorDialog";
 import { VoiceCallPanel } from "./VoiceCallPanel";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Hash,
   Users,
@@ -14,8 +12,7 @@ import {
   Trash2,
   Link,
   Share2,
-  Phone,
-  X
+  Phone
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -48,7 +45,7 @@ interface ChatRoom {
   id: string;
   name: string;
   description?: string;
-  type: 'public' | 'private' | 'direct';
+  type: 'public' | 'private';
   avatar?: string;
   inviteCode?: string;
   createdBy?: string;
@@ -77,47 +74,6 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [voiceCallOpen, setVoiceCallOpen] = useState(false);
-  
-  const isDM = room.type === 'direct';
-  
-  // For DMs, find the other user
-  const otherUser = isDM 
-    ? room.members.find(m => m.id !== currentUserId)
-    : null;
-
-  // Real-time status tracking for DMs
-  const [otherUserStatus, setOtherUserStatus] = useState<'online' | 'offline' | 'away' | 'busy'>(
-    otherUser?.status || 'offline'
-  );
-
-  // Subscribe to real-time status updates for the other user in DMs
-  useEffect(() => {
-    if (!isDM || !otherUser?.id) return;
-
-    // Set initial status
-    setOtherUserStatus(otherUser.status || 'offline');
-
-    const channel = supabase
-      .channel(`dm-status-${otherUser.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${otherUser.id}`,
-        },
-        (payload) => {
-          const newStatus = (payload.new as any).status as 'online' | 'offline' | 'away' | 'busy';
-          setOtherUserStatus(newStatus || 'offline');
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isDM, otherUser?.id, otherUser?.status]);
 
   const onlineMembers = room.members.filter(m => m.status === 'online').length;
 
@@ -144,10 +100,7 @@ export function ChatHeader({
   };
 
   const handleLeave = async () => {
-    const message = isDM 
-      ? 'Tem certeza que deseja sair desta conversa?' 
-      : 'Tem certeza que deseja sair deste canal?';
-    if (confirm(message)) {
+    if (confirm('Tem certeza que deseja sair deste canal?')) {
       await onLeaveRoom?.(room.id);
     }
   };
@@ -158,60 +111,7 @@ export function ChatHeader({
     }
   };
 
-  // For DMs, render a minimal header with ONLY the other user's info
-  if (isDM) {
-    // If we can't resolve the other user, don't render the header
-    if (!otherUser) {
-      return (
-        <div className="h-14 px-4 flex items-center border-b border-border bg-card">
-          <p className="text-muted-foreground">Conversa inválida</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="h-14 px-4 flex items-center justify-between border-b border-border bg-card">
-        <div className="flex items-center gap-3 min-w-0">
-          <UserAvatar
-            src={otherUser.avatar}
-            username={otherUser.username}
-            status={otherUserStatus}
-            size="sm"
-          />
-          <div className="min-w-0">
-            <h2 className="font-medium text-foreground truncate">
-              {otherUser.username}
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              {otherUserStatus === 'online' ? 'Online' : 
-               otherUserStatus === 'away' ? 'Ausente' :
-               otherUserStatus === 'busy' ? 'Ocupado' : 'Offline'}
-            </p>
-          </div>
-        </div>
-
-        {/* Minimal actions for DM - just close conversation */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="p-2 rounded-md hover:bg-muted transition-colors">
-              <MoreVertical className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem 
-              onClick={handleLeave}
-              className="text-destructive focus:text-destructive"
-            >
-              <X className="w-4 h-4 mr-2" />
-              Fechar Conversa
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    );
-  }
-
-  // Regular channel header
+  // Channel header only (no DM support)
   return (
     <>
       <div className="h-14 px-4 flex items-center justify-between border-b border-border bg-card">

@@ -42,7 +42,7 @@ interface ChatRoom {
   id: string;
   name: string;
   description?: string;
-  type: 'public' | 'private' | 'direct';
+  type: 'public' | 'private';
   avatar?: string;
   inviteCode?: string;
   createdBy?: string;
@@ -182,7 +182,7 @@ export function ChatView({
             Bem-vindo ao ChatFlow
           </h2>
           <p className="text-muted-foreground">
-            Selecione um canal ou comece uma conversa com um amigo
+            Selecione um canal para começar a conversar
           </p>
         </div>
       </div>
@@ -221,8 +221,8 @@ export function ChatView({
         onRegenerateCode={onRegenerateCode}
       />
 
-      {/* Active call banner - only show for groups, not in call, and when there's an active call */}
-      {room.type !== 'direct' && hasActiveCall && !isInCall && (
+      {/* Active call banner - show when there's an active call */}
+      {hasActiveCall && !isInCall && (
         <ActiveCallBanner
           participants={participants}
           starterName={callStarterName}
@@ -241,19 +241,13 @@ export function ChatView({
           <div className="h-full flex flex-col items-center justify-center px-6">
             <div className="text-center max-w-sm">
               <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-muted flex items-center justify-center">
-                {room.type === 'direct' ? (
-                  <MessageSquare className="w-8 h-8 text-muted-foreground" />
-                ) : (
-                  <Hash className="w-8 h-8 text-muted-foreground" />
-                )}
+                <Hash className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="text-lg font-semibold mb-2">
-                {room.type === 'direct' ? 'Comece a conversa' : `Bem-vindo ao #${room.name}`}
+                Bem-vindo ao #{room.name}
               </h3>
               <p className="text-muted-foreground text-sm">
-                {room.type === 'direct' 
-                  ? `Envie uma mensagem para ${room.name}`
-                  : room.description || 'Este é o início do canal. Diga olá!'}
+                {room.description || 'Este é o início do canal. Diga olá!'}
               </p>
             </div>
           </div>
@@ -285,7 +279,7 @@ export function ChatView({
         onTyping={onTyping}
         replyTo={replyingTo as any}
         onCancelReply={onCancelReply}
-        placeholder={`Mensagem ${room.type === 'direct' ? room.name : '#' + room.name}...`}
+        placeholder={`Mensagem #${room.name}...`}
         roomMembers={room.members.map(m => ({
           id: m.id,
           username: m.username,
