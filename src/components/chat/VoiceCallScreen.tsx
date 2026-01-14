@@ -8,10 +8,12 @@ import {
   MicOff,
   Volume2,
   Monitor,
-  MonitorOff
+  MonitorOff,
+  Minimize2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Participant, ScreenShareInfo } from "@/hooks/useVoiceCall";
+import { useVoiceCallContext } from "@/contexts/VoiceCallContext";
 
 interface VoiceCallScreenProps {
   roomName: string;
@@ -38,6 +40,8 @@ export function VoiceCallScreen({
   onToggleScreenShare,
   onLeave,
 }: VoiceCallScreenProps) {
+  const voiceCallContext = useVoiceCallContext();
+
   const formatDuration = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -49,6 +53,10 @@ export function VoiceCallScreen({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleMinimize = () => {
+    voiceCallContext.minimizeCall();
+  };
+
   return (
     <div className="fixed inset-0 bg-background/95 backdrop-blur-sm z-50 flex flex-col">
       {/* Header */}
@@ -57,11 +65,22 @@ export function VoiceCallScreen({
           <h2 className="text-lg font-semibold">Chamada de Voz</h2>
           <p className="text-sm text-muted-foreground">#{roomName}</p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 rounded-full">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          <span className="text-sm font-mono font-medium text-green-500">
-            {formatDuration(callDuration)}
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 rounded-full">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="text-sm font-mono font-medium text-green-500">
+              {formatDuration(callDuration)}
+            </span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full"
+            onClick={handleMinimize}
+            title="Minimizar chamada"
+          >
+            <Minimize2 className="w-5 h-5" />
+          </Button>
         </div>
       </div>
 
@@ -152,6 +171,15 @@ export function VoiceCallScreen({
             title={isScreenSharing ? "Parar compartilhamento" : "Compartilhar tela"}
           >
             {isScreenSharing ? <MonitorOff className="w-6 h-6" /> : <Monitor className="w-6 h-6" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="lg"
+            className="rounded-full w-14 h-14"
+            onClick={handleMinimize}
+            title="Minimizar chamada"
+          >
+            <Minimize2 className="w-6 h-6" />
           </Button>
           <Button
             variant="destructive"
