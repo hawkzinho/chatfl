@@ -2,6 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { RoomEditorDialog } from "./RoomEditorDialog";
 import { VoiceCallPanel } from "./VoiceCallPanel";
+import { GroupMembersDialog } from "./GroupMembersDialog";
 import {
   Hash,
   Users,
@@ -61,6 +62,7 @@ interface ChatHeaderProps {
   onLeaveRoom?: (roomId: string) => Promise<void>;
   onUpdateRoom?: (roomId: string, name: string, description: string, avatarUrl?: string) => Promise<void>;
   onRegenerateCode?: (roomId: string) => Promise<void>;
+  onRemoveMember?: (roomId: string, userId: string) => Promise<void>;
 }
 
 export function ChatHeader({ 
@@ -71,9 +73,11 @@ export function ChatHeader({
   onLeaveRoom,
   onUpdateRoom,
   onRegenerateCode,
+  onRemoveMember,
 }: ChatHeaderProps) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [voiceCallOpen, setVoiceCallOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
 
   const onlineMembers = room.members.filter(m => m.status === 'online').length;
 
@@ -115,7 +119,10 @@ export function ChatHeader({
   return (
     <>
       <div className="h-14 px-4 flex items-center justify-between border-b border-border bg-card">
-        <div className="flex items-center gap-3 min-w-0">
+        <button 
+          onClick={() => setMembersOpen(true)}
+          className="flex items-center gap-3 min-w-0 hover:opacity-80 transition-opacity cursor-pointer text-left"
+        >
           {room.avatar ? (
             <div className="w-8 h-8 rounded-md overflow-hidden">
               <img 
@@ -138,13 +145,13 @@ export function ChatHeader({
               {room.inviteCode && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button
-                      onClick={copyInviteCode}
-                      className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                    <span
+                      onClick={(e) => { e.stopPropagation(); copyInviteCode(); }}
+                      className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 cursor-pointer"
                     >
                       {room.inviteCode}
                       <Copy className="w-3 h-3" />
-                    </button>
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent>Copiar código de convite</TooltipContent>
                 </Tooltip>
@@ -154,7 +161,7 @@ export function ChatHeader({
               {room.description || `${room.members.length} membros • ${onlineMembers} online`}
             </p>
           </div>
-        </div>
+        </button>
 
         <div className="flex items-center gap-1">
           <Tooltip>
@@ -185,7 +192,10 @@ export function ChatHeader({
           
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="p-2 rounded-md hover:bg-muted transition-colors">
+              <button 
+                onClick={() => setMembersOpen(true)}
+                className="p-2 rounded-md hover:bg-muted transition-colors"
+              >
                 <Users className="w-4 h-4 text-muted-foreground" />
               </button>
             </TooltipTrigger>
@@ -274,6 +284,18 @@ export function ChatHeader({
           />
         </SheetContent>
       </Sheet>
+
+      {/* Group Members Dialog */}
+      <GroupMembersDialog
+        open={membersOpen}
+        onOpenChange={setMembersOpen}
+        roomName={room.name}
+        roomAvatar={room.avatar}
+        members={room.members}
+        ownerId={room.createdBy}
+        currentUserId={currentUserId}
+        onRemoveMember={onRemoveMember ? (userId) => onRemoveMember(room.id, userId) : undefined}
+      />
     </>
   );
 }
