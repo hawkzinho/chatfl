@@ -7,14 +7,21 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Hash, UserMinus, Crown } from "lucide-react";
+import { Hash, UserMinus, Crown, Shield, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-interface Member {
+export interface Member {
   id: string;
   username: string;
   avatar?: string;
   status: 'online' | 'offline' | 'away' | 'busy';
+  role?: 'owner' | 'admin' | 'member';
 }
 
 interface GroupMembersDialogProps {
@@ -25,7 +32,9 @@ interface GroupMembersDialogProps {
   members: Member[];
   ownerId?: string;
   currentUserId?: string;
+  currentUserRole?: 'owner' | 'admin' | 'member';
   onRemoveMember?: (userId: string) => Promise<void>;
+  onUpdateMemberRole?: (userId: string, role: 'admin' | 'member') => Promise<void>;
 }
 
 export function GroupMembersDialog({
@@ -36,11 +45,15 @@ export function GroupMembersDialog({
   members,
   ownerId,
   currentUserId,
+  currentUserRole,
   onRemoveMember,
+  onUpdateMemberRole,
 }: GroupMembersDialogProps) {
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
   
   const isOwner = currentUserId === ownerId;
+  const isAdmin = currentUserRole === 'admin' || isOwner;
 
   const handleRemoveMember = async (userId: string) => {
     if (!onRemoveMember) return;
@@ -52,6 +65,16 @@ export function GroupMembersDialog({
     }
   };
 
+  const handleUpdateRole = async (userId: string, role: 'admin' | 'member') => {
+    if (!onUpdateMemberRole) return;
+    setUpdatingRoleId(userId);
+    try {
+      await onUpdateMemberRole(userId, role);
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'online': return 'bg-green-500';
@@ -59,6 +82,26 @@ export function GroupMembersDialog({
       case 'busy': return 'bg-red-500';
       default: return 'bg-muted-foreground';
     }
+  };
+
+  const getRoleBadge = (member: Member) => {
+    if (member.id === ownerId) {
+      return (
+        <div className="flex items-center gap-1 text-xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-2 py-0.5 rounded-full">
+          <Crown className="w-3 h-3" />
+          <span>Dono</span>
+        </div>
+      );
+    }
+    if (member.role === 'admin') {
+      return (
+        <div className="flex items-center gap-1 text-xs bg-blue-500/20 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full">
+          <Shield className="w-3 h-3" />
+          <span>Admin</span>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -91,7 +134,16 @@ export function GroupMembersDialog({
         <div className="mt-4 max-h-80 overflow-y-auto space-y-1">
           {members.map((member) => {
             const isMemberOwner = member.id === ownerId;
-            const canRemove = isOwner && !isMemberOwner && onRemoveMember;
+            const isMemberAdmin = member.role === 'admin';
+            const isSelf = member.id === currentUserId;
+            
+            // Can remove: owner can remove anyone except themselves, admin can remove members (not other admins or owner)
+            const canRemove = !isSelf && !isMemberOwner && (
+              isOwner || (isAdmin && !isMemberAdmin)
+            ) && onRemoveMember;
+            
+            // Can change role: only owner can promote/demote, but not themselves
+            const canChangeRole = isOwner && !isMemberOwner && !isSelf && onUpdateMemberRole;
             
             return (
               <div
@@ -113,28 +165,68 @@ export function GroupMembersDialog({
                       )}
                     />
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-1">
                     <span className="font-medium text-foreground">
                       {member.username}
                     </span>
-                    {isMemberOwner && (
-                      <Crown className="w-4 h-4 text-yellow-500" />
-                    )}
+                    {getRoleBadge(member)}
                   </div>
                 </div>
 
-                {canRemove && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemoveMember(member.id)}
-                    disabled={removingId === member.id}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <UserMinus className="w-4 h-4 mr-1" />
-                    {removingId === member.id ? 'Removendo...' : 'Remover'}
-                  </Button>
-                )}
+                <div className="flex items-center gap-1">
+                  {canChangeRole && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={updatingRoleId === member.id}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          {updatingRoleId === member.id ? (
+                            'Alterando...'
+                          ) : (
+                            <>
+                              Cargo
+                              <ChevronDown className="w-3 h-3 ml-1" />
+                            </>
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-popover">
+                        <DropdownMenuItem
+                          onClick={() => handleUpdateRole(member.id, 'admin')}
+                          disabled={isMemberAdmin}
+                          className={cn(isMemberAdmin && "opacity-50")}
+                        >
+                          <Shield className="w-4 h-4 mr-2 text-blue-500" />
+                          Promover a Admin
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleUpdateRole(member.id, 'member')}
+                          disabled={!isMemberAdmin}
+                          className={cn(!isMemberAdmin && "opacity-50")}
+                        >
+                          <UserMinus className="w-4 h-4 mr-2" />
+                          Remover Admin
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+
+                  {canRemove && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveMember(member.id)}
+                      disabled={removingId === member.id}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <UserMinus className="w-4 h-4 mr-1" />
+                      {removingId === member.id ? 'Removendo...' : 'Remover'}
+                    </Button>
+                  )}
+                </div>
               </div>
             );
           })}

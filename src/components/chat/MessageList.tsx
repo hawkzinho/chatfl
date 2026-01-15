@@ -22,6 +22,7 @@ interface MessageListProps {
   onEdit?: (message: Message) => void;
   onDelete?: (message: Message) => void;
   onReact?: (messageId: string, emoji: string) => void;
+  isAdmin?: boolean;
 }
 
 const isSameDay = (date1: Date, date2: Date): boolean => {
@@ -62,6 +63,7 @@ export function MessageList({
   onEdit,
   onDelete,
   onReact,
+  isAdmin = false,
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -179,7 +181,7 @@ export function MessageList({
                     currentUsername={currentUsername}
                     onReply={onReply}
                     onEdit={onEdit}
-                    onDelete={onDelete}
+                    onDelete={isAdmin || message.senderId === currentUserId ? onDelete : undefined}
                     onReact={onReact}
                   />
                 )}

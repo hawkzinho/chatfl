@@ -62,12 +62,13 @@ interface ChatViewProps {
   messages: Message[];
   currentUserId: string;
   currentUsername?: string;
+  currentUserRole?: 'owner' | 'admin' | 'member';
   typingUsers?: string[];
   onSendMessage: (content: string, files?: File[]) => void;
   onReply?: (message: Message) => void;
   onReact?: (messageId: string, emoji: string) => void;
   onEditMessage?: (messageId: string, content: string) => void;
-  onDeleteMessage?: (messageId: string) => void;
+  onDeleteMessage?: (messageId: string, isAdmin?: boolean) => void;
   onTyping?: () => void;
   replyingTo?: Message;
   onCancelReply?: () => void;
@@ -77,6 +78,7 @@ interface ChatViewProps {
   onUpdateRoom?: (roomId: string, name: string, description: string, avatarUrl?: string) => Promise<void>;
   onRegenerateCode?: (roomId: string) => Promise<void>;
   onRemoveMember?: (roomId: string, userId: string) => Promise<void>;
+  onUpdateMemberRole?: (roomId: string, userId: string, role: 'admin' | 'member') => Promise<void>;
   friends?: Friend[];
   onInviteFriend?: (friendId: string) => void;
 }
@@ -86,6 +88,7 @@ export function ChatView({
   messages,
   currentUserId,
   currentUsername,
+  currentUserRole,
   typingUsers = [],
   onSendMessage,
   onReply,
@@ -101,6 +104,7 @@ export function ChatView({
   onUpdateRoom,
   onRegenerateCode,
   onRemoveMember,
+  onUpdateMemberRole,
   friends = [],
   onInviteFriend,
 }: ChatViewProps) {
@@ -192,7 +196,7 @@ export function ChatView({
   }
 
   const isOwner = room.createdBy === currentUserId;
-
+  const isAdmin = currentUserRole === 'admin' || currentUserRole === 'owner' || isOwner;
   // Show full-screen call interface when in call and not minimized
   if (showCallScreen) {
     return (
@@ -216,12 +220,14 @@ export function ChatView({
       <ChatHeader 
         room={room} 
         currentUserId={currentUserId}
+        currentUserRole={currentUserRole || (isOwner ? 'owner' : 'member')}
         isOwner={isOwner}
         onDeleteRoom={onDeleteRoom}
         onLeaveRoom={onLeaveRoom}
         onUpdateRoom={onUpdateRoom}
         onRegenerateCode={onRegenerateCode}
         onRemoveMember={onRemoveMember}
+        onUpdateMemberRole={onUpdateMemberRole}
       />
 
       {/* Active call banner - show when there's an active call */}
@@ -269,10 +275,13 @@ export function ChatView({
             } : undefined}
             onDelete={onDeleteMessage ? (msg: any) => {
               if (confirm('Excluir esta mensagem?')) {
-                onDeleteMessage(msg.id);
+                // Check if user is admin/owner or message owner
+                const canDeleteAsAdmin = isAdmin && msg.senderId !== currentUserId;
+                onDeleteMessage(msg.id, canDeleteAsAdmin);
               }
             } : undefined}
             onReact={onReact}
+            isAdmin={isAdmin}
           />
         )}
       </div>

@@ -317,9 +317,24 @@ export const useMessages = (roomId: string | null) => {
     }
   };
 
-  const deleteMessage = async (messageId: string) => {
+  const deleteMessage = async (messageId: string, isAdmin: boolean = false) => {
     if (!user) return;
 
+    // If admin/owner, delete directly without sender check (RLS handles permission)
+    if (isAdmin) {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId);
+
+      if (error) {
+        toast.error('Failed to delete message');
+        console.error(error);
+      }
+      return;
+    }
+
+    // Regular user can only delete their own messages
     const { error } = await supabase
       .from('messages')
       .delete()
