@@ -16,7 +16,7 @@ import { toast } from '@/lib/notifications';
 const Index = () => {
   const navigate = useNavigate();
   const { user, profile, loading: authLoading, signOut } = useAuth();
-  const { rooms, createRoom, refreshRooms, joinByCode, deleteRoom, updateRoom, regenerateInviteCode, leaveRoom, removeMember } = useRooms();
+  const { rooms, createRoom, refreshRooms, joinByCode, deleteRoom, updateRoom, regenerateInviteCode, leaveRoom, removeMember, updateMemberRole, getCurrentUserRole } = useRooms();
   const { friends, pendingRequests, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, removeFriend } = useFriendships();
   const { pendingInvites, sendInvite, acceptInvite, rejectInvite } = useRoomInvites();
   
@@ -112,6 +112,10 @@ const Index = () => {
     await removeMember(roomId, userId);
   };
 
+  const handleUpdateMemberRole = async (roomId: string, userId: string, role: 'admin' | 'member') => {
+    await updateMemberRole(roomId, userId, role);
+  };
+
   const handleInviteAccepted = async (roomId: string) => {
     await refreshRooms();
     setActiveRoomId(roomId);
@@ -162,6 +166,7 @@ const Index = () => {
       username: m.username,
       avatar: m.avatar_url || undefined,
       status: m.status as 'online' | 'offline' | 'away' | 'busy',
+      role: m.role,
     })) || [],
     lastMessage: r.last_message ? {
       id: 'last',
@@ -234,9 +239,13 @@ const Index = () => {
       username: m.username,
       avatar: m.avatar_url || undefined,
       status: m.status as 'online' | 'offline' | 'away' | 'busy',
+      role: m.role,
     })) || [],
     createdAt: new Date(activeRoom.created_at),
   } : null;
+
+  // Get current user's role in the active room
+  const currentUserRole = activeRoomId ? getCurrentUserRole(activeRoomId) : 'member';
 
   // Transform friends for sidebar
   const friendsList = friends.map(f => ({
@@ -286,6 +295,7 @@ const Index = () => {
         messages={chatMessages}
         currentUserId={user.id}
         currentUsername={profile.username}
+        currentUserRole={currentUserRole}
         typingUsers={typingUsernames}
         onSendMessage={handleSendMessage}
         onReply={handleReply}
@@ -313,6 +323,7 @@ const Index = () => {
         onUpdateRoom={updateRoom}
         onRegenerateCode={regenerateInviteCode}
         onRemoveMember={handleRemoveMember}
+        onUpdateMemberRole={handleUpdateMemberRole}
         friends={friendsList}
         onInviteFriend={handleSendRoomInvite}
       />

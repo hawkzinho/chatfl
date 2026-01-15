@@ -38,6 +38,7 @@ interface Profile {
   username: string;
   avatar_url: string | null;
   status: string;
+  role?: 'owner' | 'admin' | 'member';
 }
 
 export const useRooms = () => {
@@ -92,14 +93,18 @@ export const useRooms = () => {
           .from('room_members')
           .select(`
             user_id,
+            role,
             profiles (id, username, avatar_url, status)
           `)
           .eq('room_id', room.id);
 
-        // Extract profiles from members data
+        // Extract profiles from members data with role
         const members = membersData
           ?.filter(m => m.profiles)
-          .map(m => m.profiles as Profile) || [];
+          .map(m => ({
+            ...(m.profiles as Omit<Profile, 'role'>),
+            role: (m.role as 'owner' | 'admin' | 'member') || 'member',
+          })) || [];
 
         return {
           ...room,
@@ -371,16 +376,40 @@ export const useRooms = () => {
   const removeMember = async (roomId: string, userId: string) => {
     if (!user) return;
 
-    // Check if current user is the room owner
     const room = rooms.find(r => r.id === roomId);
-    if (!room || room.created_by !== user.id) {
-      toast.error('Apenas o dono do grupo pode remover membros');
+    if (!room) {
+      toast.error('Grupo não encontrado');
+      return;
+    }
+
+    // Get current user's role in the room
+    const currentUserMember = room.members?.find(m => m.id === user.id);
+    const currentUserRole = currentUserMember?.role || 'member';
+    const isOwner = room.created_by === user.id;
+    const isAdmin = currentUserRole === 'admin' || isOwner;
+
+    // Check if current user has permission
+    if (!isAdmin) {
+      toast.error('Você não tem permissão para remover membros');
       return;
     }
 
     // Cannot remove yourself
     if (userId === user.id) {
       toast.error('Você não pode remover a si mesmo');
+      return;
+    }
+
+    // Cannot remove the owner
+    if (userId === room.created_by) {
+      toast.error('Não é possível remover o dono do grupo');
+      return;
+    }
+
+    // Admins cannot remove other admins (only owner can)
+    const targetMember = room.members?.find(m => m.id === userId);
+    if (!isOwner && targetMember?.role === 'admin') {
+      toast.error('Apenas o dono pode remover administradores');
       return;
     }
 
@@ -410,6 +439,62 @@ export const useRooms = () => {
     toast.success('Membro removido');
   };
 
+  const updateMemberRole = async (roomId: string, userId: string, role: 'admin' | 'member') => {
+    if (!user) return;
+
+    const room = rooms.find(r => r.id === roomId);
+    if (!room) {
+      toast.error('Grupo não encontrado');
+      return;
+    }
+
+    // Only owner can change roles
+    if (room.created_by !== user.id) {
+      toast.error('Apenas o dono do grupo pode alterar cargos');
+      return;
+    }
+
+    // Cannot change own role
+    if (userId === user.id) {
+      toast.error('Você não pode alterar seu próprio cargo');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('room_members')
+      .update({ role })
+      .eq('room_id', roomId)
+      .eq('user_id', userId);
+
+    if (error) {
+      toast.error('Falha ao alterar cargo');
+      console.error(error);
+      return;
+    }
+
+    // Get the member's username for system message
+    const { data: memberProfile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', userId)
+      .single();
+
+    const roleText = role === 'admin' ? 'promovido a administrador' : 'removido como administrador';
+    await sendSystemMessage(roomId, user.id, `⚙️ ${memberProfile?.username || 'Usuário'} foi ${roleText}`);
+
+    await fetchRooms();
+    toast.success(role === 'admin' ? 'Membro promovido a admin' : 'Admin removido');
+  };
+
+  const getCurrentUserRole = (roomId: string): 'owner' | 'admin' | 'member' => {
+    if (!user) return 'member';
+    const room = rooms.find(r => r.id === roomId);
+    if (!room) return 'member';
+    if (room.created_by === user.id) return 'owner';
+    const member = room.members?.find(m => m.id === user.id);
+    return member?.role || 'member';
+  };
+
   return {
     rooms,
     loading,
@@ -421,6 +506,8 @@ export const useRooms = () => {
     updateRoom,
     regenerateInviteCode,
     removeMember,
+    updateMemberRole,
+    getCurrentUserRole,
     refreshRooms: fetchRooms,
   };
 };

@@ -57,23 +57,27 @@ interface ChatRoom {
 interface ChatHeaderProps {
   room: ChatRoom;
   currentUserId?: string;
+  currentUserRole?: 'owner' | 'admin' | 'member';
   isOwner?: boolean;
   onDeleteRoom?: (roomId: string) => Promise<void>;
   onLeaveRoom?: (roomId: string) => Promise<void>;
   onUpdateRoom?: (roomId: string, name: string, description: string, avatarUrl?: string) => Promise<void>;
   onRegenerateCode?: (roomId: string) => Promise<void>;
   onRemoveMember?: (roomId: string, userId: string) => Promise<void>;
+  onUpdateMemberRole?: (roomId: string, userId: string, role: 'admin' | 'member') => Promise<void>;
 }
 
 export function ChatHeader({ 
   room, 
   currentUserId,
+  currentUserRole,
   isOwner = false,
   onDeleteRoom,
   onLeaveRoom,
   onUpdateRoom,
   onRegenerateCode,
   onRemoveMember,
+  onUpdateMemberRole,
 }: ChatHeaderProps) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [voiceCallOpen, setVoiceCallOpen] = useState(false);
@@ -291,10 +295,15 @@ export function ChatHeader({
         onOpenChange={setMembersOpen}
         roomName={room.name}
         roomAvatar={room.avatar}
-        members={room.members}
+        members={room.members.map(m => ({
+          ...m,
+          role: room.createdBy === m.id ? 'owner' as const : (m as any).role || 'member',
+        }))}
         ownerId={room.createdBy}
         currentUserId={currentUserId}
+        currentUserRole={currentUserRole}
         onRemoveMember={onRemoveMember ? (userId) => onRemoveMember(room.id, userId) : undefined}
+        onUpdateMemberRole={onUpdateMemberRole ? (userId, role) => onUpdateMemberRole(room.id, userId, role) : undefined}
       />
     </>
   );
