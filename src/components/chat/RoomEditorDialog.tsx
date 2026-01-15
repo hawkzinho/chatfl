@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ProfilePhotoUpload } from "./ProfilePhotoUpload";
 import { Settings, Trash2, Copy, RefreshCw, Camera } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
 
 interface RoomEditorDialogProps {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { toast } from 'sonner';
+import { toast } from '@/lib/notifications';
 
 // System message prefix for detection
 const SYSTEM_MESSAGE_PREFIX = '🔔 SISTEMA: ';

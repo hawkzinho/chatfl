@@ -11,7 +11,7 @@ import { useMicrophonePermission } from '@/hooks/useMicrophonePermission';
 import { Sidebar } from '@/components/chat/Sidebar';
 import { ChatView } from '@/components/chat/ChatView';
 import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/notifications';
 
 const Index = () => {
   const navigate = useNavigate();

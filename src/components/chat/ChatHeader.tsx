@@ -33,7 +33,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { toast } from "sonner";
+import { toast } from "@/lib/notifications";
 
 interface User {
   id: string;
