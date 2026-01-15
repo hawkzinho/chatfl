@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { toast } from 'sonner';
+import { toast, playNotificationSound } from '@/lib/notifications';
+
 
 interface Profile {
   id: string;
@@ -25,6 +26,7 @@ export const useFriendships = () => {
   const [pendingRequests, setPendingRequests] = useState<Friendship[]>([]);
   const [sentRequests, setSentRequests] = useState<Friendship[]>([]);
   const [loading, setLoading] = useState(true);
+  const lastFetchedRef = useRef<string | null>(null);
 
   const fetchFriendships = async () => {
     if (!user) return;
@@ -81,6 +83,104 @@ export const useFriendships = () => {
 
   useEffect(() => {
     fetchFriendships();
+  }, [user]);
+
+  // Real-time subscription for friend requests
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('friendships-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'friendships',
+          filter: `addressee_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          // New friend request received
+          const newRequest = payload.new as { id: string; requester_id: string; status: string };
+          
+          if (newRequest.status === 'pending') {
+            // Fetch the requester's profile
+            const { data: requesterProfile } = await supabase
+              .from('profiles')
+              .select('id, username, avatar_url, status')
+              .eq('id', newRequest.requester_id)
+              .single();
+
+            if (requesterProfile) {
+              // Play notification sound
+              playNotificationSound();
+              
+              // Show browser notification
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Nova solicitação de amizade!', {
+                  body: `${requesterProfile.username} quer ser seu amigo`,
+                  icon: '/favicon.ico',
+                });
+              }
+              
+              // Show in-app toast
+              toast.success(`${requesterProfile.username} enviou uma solicitação de amizade!`, {
+                duration: 5000,
+              });
+              
+              // Refresh the list
+              await fetchFriendships();
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'friendships',
+        },
+        async (payload) => {
+          const updated = payload.new as { id: string; requester_id: string; addressee_id: string; status: string };
+          
+          // Only notify if user is involved
+          if (updated.requester_id === user.id || updated.addressee_id === user.id) {
+            if (updated.status === 'accepted' && updated.requester_id === user.id) {
+              // Friend request was accepted - notify the requester
+              const { data: addresseeProfile } = await supabase
+                .from('profiles')
+                .select('username')
+                .eq('id', updated.addressee_id)
+                .single();
+
+              if (addresseeProfile) {
+                playNotificationSound();
+                toast.success(`${addresseeProfile.username} aceitou sua solicitação de amizade!`);
+              }
+            }
+            // Refresh the list
+            await fetchFriendships();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'friendships',
+        },
+        async () => {
+          // Just refresh the list when any friendship is deleted
+          await fetchFriendships();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const sendFriendRequest = async (username: string) => {

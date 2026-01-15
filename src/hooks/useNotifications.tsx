@@ -1,36 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { toast } from 'sonner';
-
-// Use the provided custom notification sound
-const NOTIFICATION_SOUND = '/sounds/notification.mp3';
-const MENTION_SOUND = '/sounds/notification.mp3';
-
-// Track last played time to prevent overlap
-let lastPlayedTime = 0;
-const MIN_PLAY_INTERVAL = 500; // ms
-
-const playSound = (soundPath: string, volume: number = 0.5): HTMLAudioElement | null => {
-  try {
-    const now = Date.now();
-    // Prevent overlapping sounds
-    if (now - lastPlayedTime < MIN_PLAY_INTERVAL) {
-      return null;
-    }
-    lastPlayedTime = now;
-    
-    const audio = new Audio(soundPath);
-    audio.volume = Math.min(volume, 1);
-    audio.play().catch(() => {
-      console.log('Audio autoplay blocked');
-    });
-    return audio;
-  } catch (e) {
-    console.log('Audio play failed:', e);
-    return null;
-  }
-};
+import { toast, playNotificationSound } from '@/lib/notifications';
 
 const showBrowserNotification = (title: string, body: string, onClick?: () => void) => {
   if ('Notification' in window && Notification.permission === 'granted') {
@@ -53,9 +24,9 @@ const showBrowserNotification = (title: string, body: string, onClick?: () => vo
   }
 };
 
-// Show in-app toast notification (NO sound - sound handled separately)
+// Show in-app toast notification - uses silent toast to avoid double sounds
 const showInAppNotification = (title: string, body: string) => {
-  toast(title, {
+  toast.silent.message(title, {
     description: body,
     duration: 4000,
   });
@@ -133,7 +104,6 @@ export const useNotifications = (currentRoomId: string | null, currentUsername?:
 
           const isActiveRoom = newMessage.room_id === currentRoomId;
           const isDocumentVisible = document.visibilityState === 'visible';
-          const isInsideActiveRoom = isActiveRoom && isDocumentVisible;
 
           // Determine notification content
           const notificationTitle = wasMentioned 
@@ -146,19 +116,11 @@ export const useNotifications = (currentRoomId: string | null, currentUsername?:
           
           if (!isDocumentVisible) {
             // User is OUTSIDE the site - play sound and show browser notification
-            if (wasMentioned) {
-              playSound(MENTION_SOUND, 0.7);
-            } else {
-              playSound(NOTIFICATION_SOUND, 0.5);
-            }
+            playNotificationSound(wasMentioned ? 0.7 : 0.5);
             showBrowserNotification(notificationTitle, notificationBody);
           } else if (!isActiveRoom) {
             // User is on site but different room - play sound + in-app toast
-            if (wasMentioned) {
-              playSound(MENTION_SOUND, 0.7);
-            } else {
-              playSound(NOTIFICATION_SOUND, 0.4);
-            }
+            playNotificationSound(wasMentioned ? 0.7 : 0.4);
             showInAppNotification(notificationTitle, notificationBody);
           } else if (wasMentioned) {
             // User is in the active room but was mentioned - just show toast (no sound since they're looking at it)
@@ -183,11 +145,11 @@ export const useNotifications = (currentRoomId: string | null, currentUsername?:
   }, []);
 
   const playNotification = useCallback(() => {
-    playSound(NOTIFICATION_SOUND, 0.4);
+    playNotificationSound(0.4);
   }, []);
 
   const playMentionNotification = useCallback(() => {
-    playSound(MENTION_SOUND, 0.6);
+    playNotificationSound(0.6);
   }, []);
 
   return { requestPermission, playNotification, playMentionNotification };

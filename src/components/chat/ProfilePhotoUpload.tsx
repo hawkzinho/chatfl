@@ -3,7 +3,7 @@ import { Camera, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { toast } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
 
 interface ProfilePhotoUploadProps {
