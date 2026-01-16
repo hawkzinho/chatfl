@@ -4,6 +4,7 @@ import { RoomListItem } from "./RoomListItem";
 import { UserAvatar } from "./UserAvatar";
 import { RoomInviteNotification } from "./RoomInviteNotification";
 import { ProfileSettingsDialog } from "./ProfileSettingsDialog";
+import chatflowLogo from "@/assets/chatflow-logo.png";
 import { 
   Search, 
   Plus, 
@@ -12,7 +13,6 @@ import {
   UserPlus,
   Check,
   X,
-  MessageSquare,
   Link,
   Hash,
   Trash2,
@@ -218,9 +218,11 @@ export function Sidebar({
       {/* Header */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-            <MessageSquare className="w-4 h-4 text-primary-foreground" />
-          </div>
+          <img 
+            src={chatflowLogo} 
+            alt="ChatFlow" 
+            className="w-8 h-8 rounded-md object-cover"
+          />
           <h1 className="text-lg font-semibold">ChatFlow</h1>
         </div>
 
