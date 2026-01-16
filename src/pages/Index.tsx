@@ -206,22 +206,22 @@ const Index = () => {
       size: 0,
       mimeType: m.file_type || '',
     }] : undefined,
-    replyTo: m.reply_to ? {
+    replyTo: m.reply_to && m.reply_to.id ? {
       id: m.reply_to.id,
-      content: m.reply_to.content,
-      senderId: m.reply_to.sender_id,
-      sender: m.reply_to.sender ? {
+      content: m.reply_to.content || '',
+      senderId: m.reply_to.sender_id || '',
+      sender: m.reply_to.sender && m.reply_to.sender.id ? {
         id: m.reply_to.sender.id,
-        username: m.reply_to.sender.username,
+        username: m.reply_to.sender.username || 'Unknown',
         avatar: m.reply_to.sender.avatar_url || undefined,
         status: (m.reply_to.sender.status || 'offline') as 'online' | 'offline' | 'away' | 'busy',
       } : {
-        id: m.reply_to.sender_id,
+        id: m.reply_to.sender_id || '',
         username: 'Unknown',
         status: 'offline' as const,
       },
-      roomId: m.reply_to.room_id,
-      createdAt: new Date(m.reply_to.created_at),
+      roomId: m.reply_to.room_id || '',
+      createdAt: new Date(m.reply_to.created_at || Date.now()),
     } : undefined,
   }));
 
