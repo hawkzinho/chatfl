@@ -11,18 +11,11 @@ import {
   Volume2,
   Monitor,
   MonitorOff,
-  Minimize2,
-  Wifi,
-  WifiOff
+  Minimize2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useVoiceCall, Participant } from "@/hooks/useVoiceCall";
 import { useVoiceCallContext } from "@/contexts/VoiceCallContext";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface User {
   id: string;
@@ -64,7 +57,6 @@ export function VoiceCallPanel({
 
   const voiceCallContext = useVoiceCallContext();
   const [isJoining, setIsJoining] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'reconnecting'>('connected');
 
   // Store call function references in context for global minimized bar
   useEffect(() => {
@@ -131,35 +123,12 @@ export function VoiceCallPanel({
             </h3>
             <p className="text-xs text-muted-foreground">#{roomName}</p>
           </div>
-          <div className="flex items-center gap-3">
-            {isInCall && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className={cn(
-                    "flex items-center gap-1 text-xs",
-                    connectionStatus === 'connected' ? "text-green-500" : 
-                    connectionStatus === 'reconnecting' ? "text-yellow-500" : "text-muted-foreground"
-                  )}>
-                    {connectionStatus === 'connected' ? (
-                      <Wifi className="w-3 h-3" />
-                    ) : (
-                      <WifiOff className="w-3 h-3 animate-pulse" />
-                    )}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {connectionStatus === 'connected' ? 'Conexão estável' : 
-                   connectionStatus === 'reconnecting' ? 'Reconectando...' : 'Conectando...'}
-                </TooltipContent>
-              </Tooltip>
-            )}
-            {(isInCall || hasActiveCall) && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Users className="w-3 h-3" />
-                <span>{participants.length}</span>
-              </div>
-            )}
-          </div>
+          {(isInCall || hasActiveCall) && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Users className="w-3 h-3" />
+              <span>{participants.length}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -271,65 +240,42 @@ export function VoiceCallPanel({
             </>
           ) : (
             <div className="flex justify-center gap-3">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={isMuted ? "destructive" : "outline"}
-                    size="lg"
-                    className="rounded-full w-12 h-12"
-                    onClick={toggleMute}
-                  >
-                    {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isMuted ? "Ativar microfone" : "Desativar microfone"}
-                </TooltipContent>
-              </Tooltip>
-              
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={isScreenSharing ? "default" : "outline"}
-                    size="lg"
-                    className="rounded-full w-12 h-12"
-                    onClick={isScreenSharing ? stopScreenShare : startScreenShare}
-                  >
-                    {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isScreenSharing ? "Parar compartilhamento" : "Compartilhar tela"}
-                </TooltipContent>
-              </Tooltip>
-              
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="rounded-full w-12 h-12"
-                    onClick={handleMinimize}
-                  >
-                    <Minimize2 className="w-5 h-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Minimizar chamada</TooltipContent>
-              </Tooltip>
-              
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="destructive"
-                    size="lg"
-                    className="rounded-full w-12 h-12"
-                    onClick={handleLeaveCall}
-                  >
-                    <PhoneOff className="w-5 h-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Sair da chamada</TooltipContent>
-              </Tooltip>
+              <Button
+                variant={isMuted ? "destructive" : "outline"}
+                size="lg"
+                className="rounded-full w-12 h-12"
+                onClick={toggleMute}
+                title={isMuted ? "Ativar microfone" : "Desativar microfone"}
+              >
+                {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </Button>
+              <Button
+                variant={isScreenSharing ? "default" : "outline"}
+                size="lg"
+                className="rounded-full w-12 h-12"
+                onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+                title={isScreenSharing ? "Parar compartilhamento" : "Compartilhar tela"}
+              >
+                {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                className="rounded-full w-12 h-12"
+                onClick={handleMinimize}
+                title="Minimizar chamada"
+              >
+                <Minimize2 className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="destructive"
+                size="lg"
+                className="rounded-full w-12 h-12"
+                onClick={handleLeaveCall}
+                title="Sair da chamada"
+              >
+                <PhoneOff className="w-5 h-5" />
+              </Button>
             </div>
           )}
         </div>
