@@ -85,23 +85,41 @@ export const useMessages = (roomId: string | null) => {
     const messagesWithReactions: Message[] = data.map(m => {
       // Look up replied message from our local map
       const replyToData = m.reply_to_id ? messagesById[m.reply_to_id] : null;
-      
+
+      const sender = (m.profiles as MessageProfile | null) ?? {
+        id: m.sender_id,
+        username: 'Unknown',
+        avatar_url: null,
+        status: 'offline',
+      };
+
+      const replySender = replyToData
+        ? ((replyToData.profiles as MessageProfile | null) ?? {
+            id: replyToData.sender_id,
+            username: 'Unknown',
+            avatar_url: null,
+            status: 'offline',
+          })
+        : null;
+
       return {
         ...m,
-        sender: m.profiles as MessageProfile,
-        reply_to: replyToData ? {
-          id: replyToData.id,
-          room_id: replyToData.room_id,
-          sender_id: replyToData.sender_id,
-          content: replyToData.content,
-          reply_to_id: null,
-          is_edited: false,
-          created_at: replyToData.created_at,
-          updated_at: replyToData.created_at,
-          sender: replyToData.profiles as MessageProfile,
-          reactions: [],
-        } : undefined,
-        reactions: reactionsByMessage[m.id] 
+        sender,
+        reply_to: replyToData
+          ? {
+              id: replyToData.id,
+              room_id: replyToData.room_id,
+              sender_id: replyToData.sender_id,
+              content: replyToData.content,
+              reply_to_id: null,
+              is_edited: false,
+              created_at: replyToData.created_at,
+              updated_at: replyToData.created_at,
+              sender: replySender!,
+              reactions: [],
+            }
+          : undefined,
+        reactions: reactionsByMessage[m.id]
           ? Object.entries(reactionsByMessage[m.id]).map(([emoji, users]) => ({ emoji, users }))
           : [],
       };
@@ -154,6 +172,13 @@ export const useMessages = (roomId: string | null) => {
                   .eq('id', data.reply_to_id)
                   .single();
                 if (replyMsg) {
+                  const replySender = (replyMsg.profiles as MessageProfile | null) ?? {
+                    id: replyMsg.sender_id,
+                    username: 'Unknown',
+                    avatar_url: null,
+                    status: 'offline',
+                  };
+
                   replyToData = {
                     id: replyMsg.id,
                     room_id: replyMsg.room_id,
@@ -163,15 +188,22 @@ export const useMessages = (roomId: string | null) => {
                     is_edited: false,
                     created_at: replyMsg.created_at,
                     updated_at: replyMsg.created_at,
-                    sender: replyMsg.profiles as MessageProfile,
+                    sender: replySender,
                     reactions: [],
                   };
                 }
               }
               
+              const sender = (data.profiles as MessageProfile | null) ?? {
+                id: data.sender_id,
+                username: 'Unknown',
+                avatar_url: null,
+                status: 'offline',
+              };
+
               const newMessage: Message = {
                 ...data,
-                sender: data.profiles as MessageProfile,
+                sender,
                 reply_to: replyToData || undefined,
                 reactions: [],
               };
