@@ -29,15 +29,16 @@ interface PeerConnection {
   lastAudioCheck?: number;
 }
 
-// More robust ICE servers including free TURN servers for better connectivity
+// Enhanced ICE server configuration with multiple STUN/TURN options for maximum connectivity
 const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
+    // Google STUN servers - highly reliable
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
-    // Free TURN servers for better NAT traversal
+    // Free TURN servers for NAT traversal
     {
       urls: 'turn:openrelay.metered.ca:80',
       username: 'openrelayproject',
@@ -48,14 +49,26 @@ const ICE_SERVERS: RTCConfiguration = {
       username: 'openrelayproject',
       credential: 'openrelayproject',
     },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
   ],
   iceCandidatePoolSize: 10,
+  iceTransportPolicy: 'all',
+  bundlePolicy: 'max-bundle',
+  rtcpMuxPolicy: 'require',
 };
 
-// Audio health check interval (ms)
+// Configuration constants
 const AUDIO_HEALTH_CHECK_INTERVAL = 5000;
-// Maximum time without audio activity before attempting reconnection (ms)
 const AUDIO_STALE_THRESHOLD = 15000;
+const MAX_CONNECTION_RETRIES = 5;
+const CONNECTION_RETRY_BASE_DELAY = 1000;
+const PARTICIPANT_POLL_INTERVAL = 3000;
+const STREAM_READY_TIMEOUT = 3000;
+const PEER_CONNECTION_DELAY = 400;
 
 export const useVoiceCall = (roomId: string | null) => {
   const { user, profile } = useAuth();
@@ -65,6 +78,7 @@ export const useVoiceCall = (roomId: string | null) => {
   const [callDuration, setCallDuration] = useState(0);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [remoteScreenShares, setRemoteScreenShares] = useState<ScreenShareInfo[]>([]);
+  const [connectionQuality, setConnectionQuality] = useState<'good' | 'fair' | 'poor'>('good');
   
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -84,6 +98,7 @@ export const useVoiceCall = (roomId: string | null) => {
   const audioHealthCheckRef = useRef<NodeJS.Timeout | null>(null);
   const lastAudioActivityRef = useRef<Map<string, number>>(new Map());
   const streamReadyRef = useRef(false);
+  const connectionStatsRef = useRef<Map<string, { packetsLost: number; totalPackets: number }>>(new Map());
 
   // Fetch current participants
   const fetchParticipants = useCallback(async () => {
@@ -136,12 +151,12 @@ export const useVoiceCall = (roomId: string | null) => {
     if (roomId) {
       fetchParticipants();
       
-      // Poll for participants every 3 seconds when not in call
+      // Poll for participants when not in call
       const pollInterval = setInterval(() => {
         if (!isInCall) {
           fetchParticipants();
         }
-      }, 3000);
+      }, PARTICIPANT_POLL_INTERVAL);
       
       return () => clearInterval(pollInterval);
     }
@@ -203,15 +218,20 @@ export const useVoiceCall = (roomId: string | null) => {
     };
   }, [isInCall, isMuted, user]);
 
-  // Retry connection with exponential backoff
+  // Retry connection with exponential backoff - improved with jitter
   const retryConnection = useCallback((peerId: string, attempt: number = 1) => {
-    if (attempt > 3) {
+    if (attempt > MAX_CONNECTION_RETRIES) {
       console.log(`Max retry attempts reached for ${peerId}`);
+      toast.error('Falha na conexão com participante');
       return;
     }
     
-    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-    console.log(`Scheduling retry ${attempt} for ${peerId} in ${delay}ms`);
+    // Exponential backoff with jitter for better distribution
+    const baseDelay = Math.min(CONNECTION_RETRY_BASE_DELAY * Math.pow(2, attempt - 1), 8000);
+    const jitter = Math.random() * 500;
+    const delay = baseDelay + jitter;
+    
+    console.log(`Scheduling retry ${attempt}/${MAX_CONNECTION_RETRIES} for ${peerId} in ${Math.round(delay)}ms`);
     
     const timeout = setTimeout(async () => {
       const peerConn = peerConnectionsRef.current.get(peerId);
@@ -225,16 +245,15 @@ export const useVoiceCall = (roomId: string | null) => {
     connectionRetryTimeoutsRef.current.set(peerId, timeout);
   }, []);
 
-  // Create peer connection for a user
+  // Create peer connection for a user - improved with better stream waiting
   const createPeerConnection = useCallback(async (peerId: string, initiator: boolean) => {
     if (!user || !roomId) return null;
     
     // Wait for stream to be ready if we're the initiator
     if (initiator && !streamReadyRef.current) {
       console.log(`Waiting for stream to be ready before connecting to ${peerId}`);
-      // Wait up to 2 seconds for stream to be ready
       let waitTime = 0;
-      while (!streamReadyRef.current && waitTime < 2000) {
+      while (!streamReadyRef.current && waitTime < STREAM_READY_TIMEOUT) {
         await new Promise(resolve => setTimeout(resolve, 100));
         waitTime += 100;
       }
