@@ -4,9 +4,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MessageCircle, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from '@/lib/notifications';
 import { z } from 'zod';
+import chatflowLogo from '@/assets/chatflow-logo.png';
 
 const signInSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -105,9 +106,11 @@ const Auth = () => {
         {/* Logo */}
         <div className="text-center space-y-2">
           <div className="flex justify-center">
-            <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center">
-              <MessageCircle className="w-6 h-6 text-primary-foreground" />
-            </div>
+            <img 
+              src={chatflowLogo} 
+              alt="ChatFlow" 
+              className="w-16 h-16 rounded-xl object-cover"
+            />
           </div>
           <h1 className="text-2xl font-semibold">ChatFlow</h1>
           <p className="text-sm text-muted-foreground">Entre para continuar</p>
