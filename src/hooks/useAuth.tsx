@@ -31,21 +31,71 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (authUser: User) => {
+    const userId = authUser.id;
+
+    const usernameFromMeta = (authUser.user_metadata as { username?: string } | null)?.username;
+    const usernameFromEmail = authUser.email?.split("@")[0];
+    const fallbackUsername = `user-${userId.slice(0, 6)}`;
+    const desiredUsername = usernameFromMeta || usernameFromEmail || fallbackUsername;
+
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
-    
-    if (data && !error) {
-      setProfile(data);
-      // Update status to online
-      await supabase
-        .from('profiles')
-        .update({ status: 'online', last_seen: new Date().toISOString() })
-        .eq('id', userId);
+
+    if (error) {
+      console.error('Error fetching profile:', error);
+      // Keep app usable even if profile query fails
+      setProfile({
+        id: userId,
+        username: desiredUsername,
+        avatar_url: null,
+        status: 'online',
+        last_seen: new Date().toISOString(),
+      });
+      return;
     }
+
+    if (!data) {
+      // If profile row doesn't exist yet, create it.
+      const { data: created, error: createError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          username: desiredUsername,
+          avatar_url: null,
+          status: 'online',
+          last_seen: new Date().toISOString(),
+        })
+        .select('*')
+        .single();
+
+      if (createError) {
+        console.error('Error creating profile:', createError);
+        // Keep app usable even if insert fails
+        setProfile({
+          id: userId,
+          username: desiredUsername,
+          avatar_url: null,
+          status: 'online',
+          last_seen: new Date().toISOString(),
+        });
+        return;
+      }
+
+      setProfile(created);
+      return;
+    }
+
+    setProfile(data);
+
+    // Best-effort presence update
+    await supabase
+      .from('profiles')
+      .update({ status: 'online', last_seen: new Date().toISOString() })
+      .eq('id', userId);
   };
 
   useEffect(() => {
@@ -57,7 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (session?.user) {
           setTimeout(() => {
-            fetchProfile(session.user.id);
+            fetchProfile(session.user);
           }, 0);
         } else {
           setProfile(null);
@@ -72,7 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchProfile(session.user.id);
+        fetchProfile(session.user);
       }
       setLoading(false);
     });

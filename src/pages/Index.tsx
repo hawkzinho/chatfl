@@ -130,7 +130,9 @@ const Index = () => {
     return await sendInvite(roomId, friendId);
   };
 
-  if (authLoading) {
+  const isAppLoading = authLoading || (user && !profile);
+
+  if (isAppLoading) {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -141,8 +143,33 @@ const Index = () => {
     );
   }
 
-  if (!user || !profile) {
+  if (!user) {
     return null;
+  }
+
+  if (!profile) {
+    return (
+      <div className="h-screen bg-background flex items-center justify-center p-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-foreground font-medium">Não foi possível carregar seu perfil.</p>
+          <p className="text-sm text-muted-foreground">Tente recarregar a página. Se continuar, saia e entre novamente.</p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              className="px-4 py-2 rounded-md border border-border bg-card"
+              onClick={() => window.location.reload()}
+            >
+              Recarregar
+            </button>
+            <button
+              className="px-4 py-2 rounded-md bg-primary text-primary-foreground"
+              onClick={() => signOut()}
+            >
+              Sair
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const currentUser = {
@@ -181,49 +208,58 @@ const Index = () => {
   }));
 
   // Transform messages for chat
-  const chatMessages = messages.map(m => ({
-    id: m.id,
-    content: m.content,
-    senderId: m.sender_id,
-    sender: {
-      id: m.sender.id,
-      username: m.sender.username,
-      avatar: m.sender.avatar_url || undefined,
-      status: m.sender.status as 'online' | 'offline' | 'away' | 'busy',
-    },
-    roomId: m.room_id,
-    createdAt: new Date(m.created_at),
-    updatedAt: m.updated_at ? new Date(m.updated_at) : undefined,
-    isEdited: m.is_edited,
-    reactions: m.reactions as { emoji: string; users: string[] }[],
-    attachments: m.file_url ? [{
+  const chatMessages = messages.map(m => {
+    const sender = (m.sender as any) ?? {
+      id: m.sender_id,
+      username: 'Unknown',
+      avatar_url: null,
+      status: 'offline',
+    };
+
+    return {
       id: m.id,
-      type: m.file_type?.startsWith('image/') ? 'image' as const : 
-            m.file_type?.startsWith('video/') ? 'video' as const : 
-            m.file_type?.startsWith('audio/') ? 'audio' as const : 'document' as const,
-      url: m.file_url,
-      name: m.file_name || 'arquivo',
-      size: 0,
-      mimeType: m.file_type || '',
-    }] : undefined,
-    replyTo: m.reply_to && m.reply_to.id ? {
-      id: m.reply_to.id,
-      content: m.reply_to.content || '',
-      senderId: m.reply_to.sender_id || '',
-      sender: m.reply_to.sender && m.reply_to.sender.id ? {
-        id: m.reply_to.sender.id,
-        username: m.reply_to.sender.username || 'Unknown',
-        avatar: m.reply_to.sender.avatar_url || undefined,
-        status: (m.reply_to.sender.status || 'offline') as 'online' | 'offline' | 'away' | 'busy',
-      } : {
-        id: m.reply_to.sender_id || '',
-        username: 'Unknown',
-        status: 'offline' as const,
+      content: m.content,
+      senderId: m.sender_id,
+      sender: {
+        id: sender.id,
+        username: sender.username || 'Unknown',
+        avatar: sender.avatar_url || undefined,
+        status: (sender.status || 'offline') as 'online' | 'offline' | 'away' | 'busy',
       },
-      roomId: m.reply_to.room_id || '',
-      createdAt: new Date(m.reply_to.created_at || Date.now()),
-    } : undefined,
-  }));
+      roomId: m.room_id,
+      createdAt: new Date(m.created_at),
+      updatedAt: m.updated_at ? new Date(m.updated_at) : undefined,
+      isEdited: m.is_edited,
+      reactions: (m.reactions || []) as { emoji: string; users: string[] }[],
+      attachments: m.file_url ? [{
+        id: m.id,
+        type: m.file_type?.startsWith('image/') ? 'image' as const : 
+              m.file_type?.startsWith('video/') ? 'video' as const : 
+              m.file_type?.startsWith('audio/') ? 'audio' as const : 'document' as const,
+        url: m.file_url,
+        name: m.file_name || 'arquivo',
+        size: 0,
+        mimeType: m.file_type || '',
+      }] : undefined,
+      replyTo: m.reply_to && (m.reply_to as any).id ? {
+        id: (m.reply_to as any).id,
+        content: (m.reply_to as any).content || '',
+        senderId: (m.reply_to as any).sender_id || '',
+        sender: (m.reply_to as any).sender && (m.reply_to as any).sender.id ? {
+          id: (m.reply_to as any).sender.id,
+          username: (m.reply_to as any).sender.username || 'Unknown',
+          avatar: (m.reply_to as any).sender.avatar_url || undefined,
+          status: ((m.reply_to as any).sender.status || 'offline') as 'online' | 'offline' | 'away' | 'busy',
+        } : {
+          id: (m.reply_to as any).sender_id || '',
+          username: 'Unknown',
+          status: 'offline' as const,
+        },
+        roomId: (m.reply_to as any).room_id || '',
+        createdAt: new Date((m.reply_to as any).created_at || Date.now()),
+      } : undefined,
+    };
+  });
 
   // Transform active room for chat header (channels only)
   const activeChatRoom = activeRoom ? {
@@ -307,11 +343,15 @@ const Index = () => {
           id: replyingTo.id,
           content: replyingTo.content,
           senderId: replyingTo.sender_id,
-          sender: {
+          sender: replyingTo.sender ? {
             id: replyingTo.sender.id,
-            username: replyingTo.sender.username,
+            username: replyingTo.sender.username || 'Unknown',
             avatar: replyingTo.sender.avatar_url || undefined,
-            status: replyingTo.sender.status as 'online' | 'offline' | 'away' | 'busy',
+            status: (replyingTo.sender.status || 'offline') as 'online' | 'offline' | 'away' | 'busy',
+          } : {
+            id: replyingTo.sender_id,
+            username: 'Unknown',
+            status: 'offline' as const,
           },
           roomId: replyingTo.room_id,
           createdAt: new Date(replyingTo.created_at),
