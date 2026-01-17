@@ -97,6 +97,7 @@ const Auth = () => {
       return;
     }
     
+    toast.success('Conta criada! Verifique seu email para confirmar o cadastro.');
     setActiveTab('signin');
   };
 
