@@ -21,7 +21,8 @@ import {
   Moon,
   Sun,
   Settings,
-  User
+  User,
+  MessageCircle
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -96,11 +97,30 @@ interface RoomInvite {
   };
 }
 
+interface DirectMessage {
+  id: string;
+  name: string;
+  otherUser: {
+    id: string;
+    username: string;
+    avatar_url: string | null;
+    status: string;
+  };
+  last_message?: {
+    content: string;
+    sender_username: string;
+    created_at: string;
+  };
+}
+
 interface SidebarProps {
   currentUser: User;
   rooms: ChatRoom[];
+  directMessages?: DirectMessage[];
   activeRoomId?: string;
   onSelectRoom: (roomId: string) => void;
+  onSelectDM?: (dmId: string) => void;
+  onStartDM?: (friendId: string) => Promise<string | null>;
   onCreateRoom?: (name: string, description?: string) => void;
   onSignOut?: () => void;
   friends?: Friend[];
@@ -121,8 +141,11 @@ interface SidebarProps {
 export function Sidebar({
   currentUser,
   rooms,
+  directMessages = [],
   activeRoomId,
   onSelectRoom,
+  onSelectDM,
+  onStartDM,
   onCreateRoom,
   onSignOut,
   friends = [],
@@ -142,6 +165,7 @@ export function Sidebar({
   const [searchQuery, setSearchQuery] = useState('');
   const [roomsOpen, setRoomsOpen] = useState(true);
   const [friendsOpen, setFriendsOpen] = useState(true);
+  const [dmsOpen, setDmsOpen] = useState(true);
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [addFriendOpen, setAddFriendOpen] = useState(false);
   const [joinRoomOpen, setJoinRoomOpen] = useState(false);
@@ -154,6 +178,10 @@ export function Sidebar({
 
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredDMs = directMessages.filter((dm) =>
+    dm.otherUser.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleCreateRoom = () => {
@@ -393,6 +421,56 @@ export function Sidebar({
           </CollapsibleContent>
         </Collapsible>
 
+        {/* Direct Messages Section */}
+        <Collapsible open={dmsOpen} onOpenChange={setDmsOpen}>
+          <div className="flex items-center justify-between mb-1">
+            <CollapsibleTrigger className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+              <ChevronDown className={cn('w-3 h-3 transition-transform', !dmsOpen && '-rotate-90')} />
+              Mensagens Diretas ({directMessages.length})
+            </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent className="space-y-0.5">
+            {filteredDMs.length === 0 ? (
+              <div className="px-3 py-4 text-center">
+                <MessageCircle className="w-6 h-6 text-muted-foreground/50 mx-auto mb-1" />
+                <p className="text-xs text-muted-foreground">
+                  {directMessages.length === 0 
+                    ? 'Clique em um amigo para conversar'
+                    : 'Nenhuma conversa encontrada'}
+                </p>
+              </div>
+            ) : (
+              filteredDMs.map((dm) => (
+                <button
+                  key={dm.id}
+                  onClick={() => onSelectDM?.(dm.id)}
+                  className={cn(
+                    "w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted transition-colors text-left",
+                    activeRoomId === dm.id && "bg-muted"
+                  )}
+                >
+                  <UserAvatar
+                    src={dm.otherUser.avatar_url || undefined}
+                    username={dm.otherUser.username}
+                    status={dm.otherUser.status as 'online' | 'offline' | 'away' | 'busy'}
+                    size="sm"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm truncate block">{dm.otherUser.username}</span>
+                    {dm.last_message && (
+                      <span className="text-xs text-muted-foreground truncate block">
+                        {dm.last_message.content.length > 30 
+                          ? dm.last_message.content.substring(0, 30) + '...'
+                          : dm.last_message.content}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              ))
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+
         {/* Friends Section */}
         <Collapsible open={friendsOpen} onOpenChange={setFriendsOpen}>
           <div className="flex items-center justify-between mb-1">
@@ -445,7 +523,17 @@ export function Sidebar({
             ) : (
               friends.map((friend) => (
                 <div key={friend.id} className="group relative">
-                  <div className="w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted transition-colors">
+                  <button 
+                    onClick={async () => {
+                      if (onStartDM) {
+                        const dmId = await onStartDM(friend.id);
+                        if (dmId && onSelectDM) {
+                          onSelectDM(dmId);
+                        }
+                      }
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted transition-colors text-left"
+                  >
                     <UserAvatar
                       src={friend.avatar}
                       username={friend.username}
@@ -461,7 +549,7 @@ export function Sidebar({
                         {friend.status === 'online' ? 'Online' : 'Offline'}
                       </span>
                     </div>
-                  </div>
+                  </button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
@@ -472,6 +560,17 @@ export function Sidebar({
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      {onStartDM && (
+                        <DropdownMenuItem onClick={async () => {
+                          const dmId = await onStartDM(friend.id);
+                          if (dmId && onSelectDM) {
+                            onSelectDM(dmId);
+                          }
+                        }}>
+                          <MessageCircle className="w-4 h-4 mr-2" />
+                          Enviar Mensagem
+                        </DropdownMenuItem>
+                      )}
                       {canInviteToRoom && onInviteFriendToRoom && (
                         <DropdownMenuItem onClick={() => handleInviteFriendToRoom(friend.id)}>
                           <Users className="w-4 h-4 mr-2" />
