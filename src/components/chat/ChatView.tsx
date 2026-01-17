@@ -48,6 +48,7 @@ interface ChatRoom {
   createdBy?: string;
   members: User[];
   createdAt: Date;
+  isDM?: boolean;
 }
 
 interface Friend {
@@ -250,13 +251,19 @@ export function ChatView({
           <div className="h-full flex flex-col items-center justify-center px-6">
             <div className="text-center max-w-sm">
               <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-muted flex items-center justify-center">
-                <Hash className="w-8 h-8 text-muted-foreground" />
+                {room.isDM ? (
+                  <MessageSquare className="w-8 h-8 text-muted-foreground" />
+                ) : (
+                  <Hash className="w-8 h-8 text-muted-foreground" />
+                )}
               </div>
               <h3 className="text-lg font-semibold mb-2">
-                Bem-vindo ao #{room.name}
+                {room.isDM ? `Conversa com ${room.name}` : `Bem-vindo ao #${room.name}`}
               </h3>
               <p className="text-muted-foreground text-sm">
-                {room.description || 'Este é o início do canal. Diga olá!'}
+                {room.isDM 
+                  ? 'Este é o início da sua conversa. Diga olá!'
+                  : (room.description || 'Este é o início do canal. Diga olá!')}
               </p>
             </div>
           </div>
@@ -291,7 +298,7 @@ export function ChatView({
         onTyping={onTyping}
         replyTo={replyingTo as any}
         onCancelReply={onCancelReply}
-        placeholder={`Mensagem #${room.name}...`}
+        placeholder={room.isDM ? `Mensagem para ${room.name}...` : `Mensagem #${room.name}...`}
         roomMembers={room.members.map(m => ({
           id: m.id,
           username: m.username,

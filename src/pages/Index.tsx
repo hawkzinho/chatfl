@@ -8,6 +8,7 @@ import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { useRoomInvites } from '@/hooks/useRoomInvites';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useMicrophonePermission } from '@/hooks/useMicrophonePermission';
+import { useDirectMessages } from '@/hooks/useDirectMessages';
 import { Sidebar } from '@/components/chat/Sidebar';
 import { ChatView } from '@/components/chat/ChatView';
 import { Loader2 } from 'lucide-react';
@@ -19,15 +20,20 @@ const Index = () => {
   const { rooms, createRoom, refreshRooms, joinByCode, deleteRoom, updateRoom, regenerateInviteCode, leaveRoom, removeMember, updateMemberRole, getCurrentUserRole } = useRooms();
   const { friends, pendingRequests, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, removeFriend } = useFriendships();
   const { pendingInvites, sendInvite, acceptInvite, rejectInvite } = useRoomInvites();
+  const { directMessages, getOrCreateDM, refreshDMs } = useDirectMessages();
   
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const [activeDMId, setActiveDMId] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   
-  const { messages, loading: messagesLoading, sendMessage, editMessage, deleteMessage, addReaction, removeReaction } = useMessages(activeRoomId);
-  const { typingUsers, startTyping, stopTyping } = useTypingIndicator(activeRoomId);
+  // Determine which room to show messages for
+  const activeConversationId = activeDMId || activeRoomId;
+  
+  const { messages, loading: messagesLoading, sendMessage, editMessage, deleteMessage, addReaction, removeReaction } = useMessages(activeConversationId);
+  const { typingUsers, startTyping, stopTyping } = useTypingIndicator(activeConversationId);
   
   // Initialize notifications (sound and browser notifications for regular messages only)
-  useNotifications(activeRoomId, profile?.username);
+  useNotifications(activeConversationId, profile?.username);
   
   // Request microphone permission on site load
   const { requestPermission: requestMicPermission, permissionState } = useMicrophonePermission();
@@ -53,10 +59,23 @@ const Index = () => {
   }, [rooms, activeRoomId]);
 
   const activeRoom = rooms.find(r => r.id === activeRoomId);
+  const activeDM = directMessages.find(dm => dm.id === activeDMId);
 
   const handleSelectRoom = (roomId: string) => {
     setActiveRoomId(roomId);
+    setActiveDMId(null); // Clear DM when selecting a room
     setReplyingTo(null);
+  };
+
+  const handleSelectDM = (dmId: string) => {
+    setActiveDMId(dmId);
+    setActiveRoomId(null); // Clear room when selecting a DM
+    setReplyingTo(null);
+  };
+
+  const handleStartDM = async (friendId: string): Promise<string | null> => {
+    const dmId = await getOrCreateDM(friendId);
+    return dmId;
   };
 
   const handleSendMessage = async (content: string, files?: File[]) => {
@@ -261,8 +280,29 @@ const Index = () => {
     };
   });
 
-  // Transform active room for chat header (channels only)
-  const activeChatRoom = activeRoom ? {
+  // Transform active room/DM for chat header
+  const activeChatRoom = activeDM ? {
+    id: activeDM.id,
+    name: activeDM.otherUser.username,
+    description: undefined,
+    type: 'private' as const,
+    avatar: activeDM.otherUser.avatar_url || undefined,
+    inviteCode: undefined,
+    createdBy: undefined,
+    members: [{
+      id: activeDM.otherUser.id,
+      username: activeDM.otherUser.username,
+      avatar: activeDM.otherUser.avatar_url || undefined,
+      status: activeDM.otherUser.status as 'online' | 'offline' | 'away' | 'busy',
+    }, {
+      id: user.id,
+      username: profile.username,
+      avatar: profile.avatar_url || undefined,
+      status: profile.status as 'online' | 'offline' | 'away' | 'busy',
+    }],
+    createdAt: new Date(activeDM.created_at),
+    isDM: true,
+  } : activeRoom ? {
     id: activeRoom.id,
     name: activeRoom.name,
     description: activeRoom.description || undefined,
@@ -278,6 +318,7 @@ const Index = () => {
       role: m.role,
     })) || [],
     createdAt: new Date(activeRoom.created_at),
+    isDM: false,
   } : null;
 
   // Get current user's role in the active room
@@ -299,9 +340,12 @@ const Index = () => {
     <div className="h-screen bg-background flex overflow-hidden">
       <Sidebar
         rooms={sidebarRooms}
+        directMessages={directMessages}
         currentUser={currentUser}
-        activeRoomId={activeRoomId || ''}
+        activeRoomId={activeConversationId || ''}
         onSelectRoom={handleSelectRoom}
+        onSelectDM={handleSelectDM}
+        onStartDM={handleStartDM}
         onCreateRoom={handleCreateRoom}
         onSignOut={signOut}
         friends={friendsList}

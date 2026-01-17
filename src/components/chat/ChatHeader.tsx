@@ -52,6 +52,7 @@ interface ChatRoom {
   createdBy?: string;
   members: User[];
   createdAt: Date;
+  isDM?: boolean;
 }
 
 interface ChatHeaderProps {
@@ -119,7 +120,41 @@ export function ChatHeader({
     }
   };
 
-  // Channel header only (no DM support)
+  // Get the other user in DM
+  const otherUser = room.isDM ? room.members.find(m => m.id !== currentUserId) : null;
+
+  // DM Header
+  if (room.isDM && otherUser) {
+    return (
+      <div className="h-14 px-4 flex items-center justify-between border-b border-border bg-card">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative">
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-muted">
+              {otherUser.avatar ? (
+                <img src={otherUser.avatar} alt={otherUser.username} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-sm font-medium text-muted-foreground">
+                  {otherUser.username[0]?.toUpperCase()}
+                </div>
+              )}
+            </div>
+            <span className={cn(
+              "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card",
+              otherUser.status === 'online' ? 'bg-green-500' : 'bg-muted-foreground'
+            )} />
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-medium text-foreground truncate">{otherUser.username}</h2>
+            <p className="text-xs text-muted-foreground capitalize">
+              {otherUser.status === 'online' ? 'Online' : 'Offline'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Channel header
   return (
     <>
       <div className="h-14 px-4 flex items-center justify-between border-b border-border bg-card">
